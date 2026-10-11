@@ -1,0 +1,58 @@
+# ===================================================================
+# CampusPulse — Root .gitignore
+# ===================================================================
+
+# Compiled backend artifacts & build output
+**/target/
+**/build/
+.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+# Local databases & persistent data
+**/data/
+*.mv.db
+*.trace.db
+
+# Frontend dependencies & build output
+**/node_modules/
+**/dist/
+**/dist-ssr/
+**/.vite/
+**/.vite-temp/
+
+# Logs & temporary files
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Environment files
+*.env
+*.env.local
+*.env.*.local
+*.local
+
+# IDEs & Editors
+.vscode/
+.idea/
+*.iws
+*.iml
+*.ipr
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS generated files
+.DS_Store
+Thumbs.db
