@@ -10,7 +10,10 @@
  * Handles standardized ErrorResponse payloads and extracts validation errors.
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+const rawApiUrl = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api').trim();
+const API_BASE_URL = rawApiUrl.replace(/\/+$/, '').endsWith('/api')
+  ? rawApiUrl.replace(/\/+$/, '')
+  : `${rawApiUrl.replace(/\/+$/, '')}/api`;
 
 /**
  * Custom API error carrying HTTP status and backend field validation errors.

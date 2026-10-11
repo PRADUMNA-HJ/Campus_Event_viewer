@@ -194,4 +194,72 @@ describe('AdminEventFormPage Component', () => {
       expect(screen.getByText('Dashboard Destination')).toBeInTheDocument();
     });
   });
+
+  it('maps server-returned validationErrors onto the form when backend returns 400', async () => {
+    const user = userEvent.setup();
+    const apiError = new api.ApiError('Validation failed', 400, {
+      title: 'Event title must not exceed 150 characters',
+      contactEmail: 'Contact email must be a valid email address',
+    });
+
+    vi.spyOn(api, 'createEvent').mockRejectedValue(apiError);
+
+    renderCreateForm();
+
+    await user.type(screen.getByLabelText(/Event Title/i), 'Valid Title');
+    await user.type(screen.getByLabelText(/Description & Agenda/i), 'Valid Description');
+    await user.type(screen.getByLabelText(/Location \/ Venue/i), 'Valid Venue');
+    await user.type(screen.getByLabelText(/Organizer \/ Society Name/i), 'Valid Org');
+    await user.type(screen.getByLabelText(/Contact Email/i), 'valid@campus.edu');
+    await user.type(screen.getByLabelText(/Start Date & Time/i), '2026-11-20T10:00');
+    await user.type(screen.getByLabelText(/End Date & Time/i), '2026-11-22T10:00');
+    await user.type(screen.getByLabelText(/Registration Deadline/i), '2026-11-18T10:00');
+
+    await user.click(screen.getByRole('button', { name: /Publish Event/i }));
+
+    expect(await screen.findByText('Event title must not exceed 150 characters')).toBeInTheDocument();
+    expect(screen.getByText('Contact email must be a valid email address')).toBeInTheDocument();
+  });
+
+  it('handles general server errors gracefully and shows error alert', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(api, 'createEvent').mockRejectedValue(new api.ApiError('Internal server failure', 500));
+
+    renderCreateForm();
+
+    await user.type(screen.getByLabelText(/Event Title/i), 'Valid Title');
+    await user.type(screen.getByLabelText(/Description & Agenda/i), 'Valid Description');
+    await user.type(screen.getByLabelText(/Location \/ Venue/i), 'Valid Venue');
+    await user.type(screen.getByLabelText(/Organizer \/ Society Name/i), 'Valid Org');
+    await user.type(screen.getByLabelText(/Contact Email/i), 'valid@campus.edu');
+    await user.type(screen.getByLabelText(/Start Date & Time/i), '2026-11-20T10:00');
+    await user.type(screen.getByLabelText(/End Date & Time/i), '2026-11-22T10:00');
+    await user.type(screen.getByLabelText(/Registration Deadline/i), '2026-11-18T10:00');
+
+    await user.click(screen.getByRole('button', { name: /Publish Event/i }));
+
+    expect(await screen.findByText('Internal server failure')).toBeInTheDocument();
+  });
+
+  it('handles network connection failure gracefully and displays connection error alert', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(api, 'createEvent').mockRejectedValue(new Error('Connection refused'));
+
+    renderCreateForm();
+
+    await user.type(screen.getByLabelText(/Event Title/i), 'Valid Title');
+    await user.type(screen.getByLabelText(/Description & Agenda/i), 'Valid Description');
+    await user.type(screen.getByLabelText(/Location \/ Venue/i), 'Valid Venue');
+    await user.type(screen.getByLabelText(/Organizer \/ Society Name/i), 'Valid Org');
+    await user.type(screen.getByLabelText(/Contact Email/i), 'valid@campus.edu');
+    await user.type(screen.getByLabelText(/Start Date & Time/i), '2026-11-20T10:00');
+    await user.type(screen.getByLabelText(/End Date & Time/i), '2026-11-22T10:00');
+    await user.type(screen.getByLabelText(/Registration Deadline/i), '2026-11-18T10:00');
+
+    await user.click(screen.getByRole('button', { name: /Publish Event/i }));
+
+    expect(
+      await screen.findByText('Unable to connect to the server. Please check that the backend is running.')
+    ).toBeInTheDocument();
+  });
 });

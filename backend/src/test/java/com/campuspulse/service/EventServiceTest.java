@@ -241,4 +241,105 @@ class EventServiceTest {
         assertThat(results.get(0).getTitle()).isEqualTo("AI Hackathon 2026");
         assertThat(results.get(1).getTitle()).isEqualTo("Web Development Bootcamp");
     }
+
+    @Test
+    @DisplayName("createEvent: Should throw InvalidEventException when startDateTime or endDateTime is null")
+    void testCreateEvent_NullStartOrEndDate_ThrowsException() {
+        EventCreateRequest nullStart = createSampleRequest();
+        nullStart.setStartDateTime(null);
+        assertThatThrownBy(() -> eventService.createEvent(nullStart))
+                .isInstanceOf(InvalidEventException.class)
+                .hasMessageContaining("Event start and end date/time must not be null");
+
+        EventCreateRequest nullEnd = createSampleRequest();
+        nullEnd.setEndDateTime(null);
+        assertThatThrownBy(() -> eventService.createEvent(nullEnd))
+                .isInstanceOf(InvalidEventException.class)
+                .hasMessageContaining("Event start and end date/time must not be null");
+
+        verify(eventRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("createEvent: Should throw InvalidEventException when endDateTime equals startDateTime")
+    void testCreateEvent_IdenticalStartAndEndDate_ThrowsException() {
+        EventCreateRequest request = createSampleRequest();
+        request.setEndDateTime(request.getStartDateTime());
+
+        assertThatThrownBy(() -> eventService.createEvent(request))
+                .isInstanceOf(InvalidEventException.class)
+                .hasMessageContaining("Event end date and time must be after the start date and time");
+
+        verify(eventRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("createEvent: Should succeed when registration deadline is null")
+    void testCreateEvent_NullRegistrationDeadline_Allowed() {
+        EventCreateRequest request = createSampleRequest();
+        request.setRegistrationDeadline(null);
+
+        when(eventRepository.save(any(Event.class))).thenAnswer(invocation -> {
+            Event entity = invocation.getArgument(0);
+            entity.setId(15L);
+            return entity;
+        });
+
+        EventResponse response = eventService.createEvent(request);
+
+        assertThat(response).isNotNull();
+        assertThat(response.getId()).isEqualTo(15L);
+        assertThat(response.getRegistrationDeadline()).isNull();
+        verify(eventRepository).save(any(Event.class));
+    }
+
+    @Test
+    @DisplayName("createEvent: Should default status to DRAFT when request status is null")
+    void testCreateEvent_DefaultDraftStatusWhenStatusNull() {
+        EventCreateRequest request = createSampleRequest();
+        request.setStatus(null);
+
+        when(eventRepository.save(any(Event.class))).thenAnswer(invocation -> {
+            Event entity = invocation.getArgument(0);
+            entity.setId(20L);
+            return entity;
+        });
+
+        EventResponse response = eventService.createEvent(request);
+
+        assertThat(response).isNotNull();
+        assertThat(response.getStatus()).isEqualTo(EventStatus.DRAFT);
+    }
+
+    @Test
+    @DisplayName("updateEvent: Should throw InvalidEventException when start or end date is null on update")
+    void testUpdateEvent_NullStartOrEndDate_ThrowsException() {
+        Event existing = createSampleEntity(1L);
+        EventCreateRequest updateRequest = createSampleRequest();
+        updateRequest.setStartDateTime(null);
+
+        when(eventRepository.findById(1L)).thenReturn(Optional.of(existing));
+
+        assertThatThrownBy(() -> eventService.updateEvent(1L, updateRequest))
+                .isInstanceOf(InvalidEventException.class)
+                .hasMessageContaining("Event start and end date/time must not be null");
+
+        verify(eventRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("updateEvent: Should throw InvalidEventException when end date equals start date on update")
+    void testUpdateEvent_IdenticalStartAndEndDate_ThrowsException() {
+        Event existing = createSampleEntity(1L);
+        EventCreateRequest updateRequest = createSampleRequest();
+        updateRequest.setEndDateTime(updateRequest.getStartDateTime());
+
+        when(eventRepository.findById(1L)).thenReturn(Optional.of(existing));
+
+        assertThatThrownBy(() -> eventService.updateEvent(1L, updateRequest))
+                .isInstanceOf(InvalidEventException.class)
+                .hasMessageContaining("Event end date and time must be after the start date and time");
+
+        verify(eventRepository, never()).save(any());
+    }
 }

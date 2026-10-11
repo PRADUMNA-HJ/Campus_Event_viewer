@@ -108,6 +108,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // Preflight OPTIONS requests for CORS
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        // Public health check for cloud uptime monitoring
+                        .requestMatchers(HttpMethod.GET, "/api/health").permitAll()
                         // Public administrator login
                         .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
                         // Public read-only event discovery for students and visitors

@@ -151,4 +151,81 @@ class EventEntityTest {
         assertThat(reloaded.getTitle()).isEqualTo("Updated Hackathon Title");
         assertThat(reloaded.getUpdatedAt()).isAfter(initialUpdatedAt);
     }
+
+    @Test
+    @DisplayName("Should fail validation when startDateTime is null")
+    void testValidation_NullStartDate_ThrowsException() {
+        Event event = createSampleEvent();
+        event.setStartDateTime(null);
+
+        assertThatThrownBy(() -> entityManager.persistAndFlush(event))
+                .isInstanceOf(ConstraintViolationException.class)
+                .hasMessageContaining("Start date time is required");
+    }
+
+    @Test
+    @DisplayName("Should fail validation when endDateTime is null")
+    void testValidation_NullEndDate_ThrowsException() {
+        Event event = createSampleEvent();
+        event.setEndDateTime(null);
+
+        assertThatThrownBy(() -> entityManager.persistAndFlush(event))
+                .isInstanceOf(ConstraintViolationException.class)
+                .hasMessageContaining("End date time is required");
+    }
+
+    @Test
+    @DisplayName("Should fail validation when description is blank")
+    void testValidation_BlankDescription_ThrowsException() {
+        Event event = createSampleEvent();
+        event.setDescription("   ");
+
+        assertThatThrownBy(() -> entityManager.persistAndFlush(event))
+                .isInstanceOf(ConstraintViolationException.class)
+                .hasMessageContaining("Event description is required");
+    }
+
+    @Test
+    @DisplayName("Should fail validation when location is blank")
+    void testValidation_BlankLocation_ThrowsException() {
+        Event event = createSampleEvent();
+        event.setLocation("");
+
+        assertThatThrownBy(() -> entityManager.persistAndFlush(event))
+                .isInstanceOf(ConstraintViolationException.class)
+                .hasMessageContaining("Event location is required");
+    }
+
+    @Test
+    @DisplayName("Should fail validation when organizerName is blank")
+    void testValidation_BlankOrganizerName_ThrowsException() {
+        Event event = createSampleEvent();
+        event.setOrganizerName("");
+
+        assertThatThrownBy(() -> entityManager.persistAndFlush(event))
+                .isInstanceOf(ConstraintViolationException.class)
+                .hasMessageContaining("Organizer name is required");
+    }
+
+    @Test
+    @DisplayName("Should fail validation when maxCapacity is non-positive")
+    void testValidation_NonPositiveMaxCapacity_ThrowsException() {
+        Event event = createSampleEvent();
+        event.setMaxCapacity(-5);
+
+        assertThatThrownBy(() -> entityManager.persistAndFlush(event))
+                .isInstanceOf(ConstraintViolationException.class)
+                .hasMessageContaining("Max capacity must be greater than zero");
+    }
+
+    @Test
+    @DisplayName("Should fail validation when title exceeds 150 characters")
+    void testValidation_TitleLengthExceeded_ThrowsException() {
+        Event event = createSampleEvent();
+        event.setTitle("T".repeat(151));
+
+        assertThatThrownBy(() -> entityManager.persistAndFlush(event))
+                .isInstanceOf(ConstraintViolationException.class)
+                .hasMessageContaining("Event title must not exceed 150 characters");
+    }
 }

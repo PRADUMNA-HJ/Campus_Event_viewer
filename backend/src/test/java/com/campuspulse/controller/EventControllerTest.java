@@ -235,4 +235,67 @@ class EventControllerTest {
                 .andExpect(jsonPath("$.status", is(404)))
                 .andExpect(jsonPath("$.message", is("Event not found with id: 99")));
     }
+
+    @Test
+    @DisplayName("GET /api/events/{id}: Should return 400 BAD_REQUEST when ID is not a numeric Long")
+    void testGetEventById_TypeMismatch_Returns400() throws Exception {
+        mockMvc.perform(get("/api/events/not-a-number")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status", is(400)))
+                .andExpect(jsonPath("$.error", is("Bad Request")))
+                .andExpect(jsonPath("$.message", is("Parameter 'id' must be of type 'Long'")));
+    }
+
+    @Test
+    @DisplayName("POST /api/events: Should return 400 BAD_REQUEST when JSON body is malformed syntax")
+    void testCreateEvent_MalformedJson_Returns400() throws Exception {
+        mockMvc.perform(post("/api/events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{invalid-json-content"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status", is(400)))
+                .andExpect(jsonPath("$.message", is("Malformed JSON request body or invalid value format")));
+    }
+
+    @Test
+    @DisplayName("POST /api/events: Should return 400 BAD_REQUEST when enum value is invalid")
+    void testCreateEvent_InvalidEnumValue_Returns400() throws Exception {
+        String invalidEnumJson = """
+                {
+                    "title": "Hackathon",
+                    "description": "Description",
+                    "eventType": "INVALID_ENUM_TYPE",
+                    "status": "PUBLISHED",
+                    "location": "Auditorium",
+                    "startDateTime": "2026-11-10T10:00:00",
+                    "endDateTime": "2026-11-12T10:00:00",
+                    "registrationDeadline": "2026-11-08T10:00:00",
+                    "organizerName": "Org",
+                    "contactEmail": "org@college.edu"
+                }
+                """;
+
+        mockMvc.perform(post("/api/events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(invalidEnumJson))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status", is(400)))
+                .andExpect(jsonPath("$.message", is("Malformed JSON request body or invalid value format")));
+    }
+
+    @Test
+    @DisplayName("GET /api/events: Should return 500 INTERNAL_SERVER_ERROR without leaking internals on unhandled exception")
+    void testGetUpcomingEvents_UnhandledException_ReturnsSafe500() throws Exception {
+        when(eventService.getUpcomingEvents())
+                .thenThrow(new RuntimeException("Simulated internal db error with sensitive credentials db_pass=secret123"));
+
+        mockMvc.perform(get("/api/events")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.status", is(500)))
+                .andExpect(jsonPath("$.error", is("Internal Server Error")))
+                .andExpect(jsonPath("$.message", is("An unexpected internal server error occurred")))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("secret123"))));
+    }
 }

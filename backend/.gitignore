@@ -9,6 +9,11 @@ data/
 *.mv.db
 *.trace.db
 
+### Local Environment Secrets ###
+*.env
+*.env.local
+*.env.*.local
+
 
 ### STS ###
 .apt_generated
