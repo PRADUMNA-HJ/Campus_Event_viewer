@@ -10,10 +10,13 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
+
 /**
- * Idempotent application startup runner that safely bootstraps the initial administrator account.
- * Reads credentials strictly from environment/configuration properties.
- * Will not overwrite existing administrator accounts or passwords on restart.
+ * Idempotent application startup runner that safely bootstraps the initial designated Main Admin account.
+ * Reads credentials strictly from environment/configuration properties (e.g. CAMPUSPULSE_ADMIN_*).
+ * Enforces the single-Main-Admin policy and will never overwrite existing credentials,
+ * silently promote ordinary accounts, or print credentials in logs.
  */
 @Component
 public class AdminBootstrapRunner implements CommandLineRunner {
@@ -39,20 +42,34 @@ public class AdminBootstrapRunner implements CommandLineRunner {
     public void run(String... args) {
         if (bootstrapEmail == null || bootstrapEmail.isBlank() ||
                 bootstrapPassword == null || bootstrapPassword.isBlank()) {
-            log.info("Admin bootstrap credentials not provided in environment (ADMIN_BOOTSTRAP_EMAIL / ADMIN_BOOTSTRAP_PASSWORD). Skipping initial admin seeding.");
+            log.info("Main Admin bootstrap credentials not configured in environment (CAMPUSPULSE_ADMIN_EMAIL / CAMPUSPULSE_ADMIN_PASSWORD). Skipping initial Main Admin seeding.");
             return;
         }
 
-        String email = bootstrapEmail.trim();
+        String email = bootstrapEmail.trim().toLowerCase();
 
+        // Enforce single Main Admin policy
+        long mainAdminCount = adminRepository.countByRoleIn(List.of(Role.MAIN_ADMIN, Role.ADMIN));
+        if (mainAdminCount > 0) {
+            log.info("A designated Main Admin account already exists (single Main Admin policy). Skipping bootstrap to preserve existing setup.");
+            return;
+        }
+
+        // Do not silently promote an existing account
         if (adminRepository.existsByEmailIgnoreCase(email)) {
-            log.info("Admin account [{}] already exists. Skipping bootstrap to preserve existing credentials.", email);
+            log.warn("Account [{}] already exists with non-admin privileges. Will not silently promote an existing account to Main Admin.", email);
             return;
         }
 
         String hashedPassword = passwordEncoder.encode(bootstrapPassword);
-        Admin admin = new Admin(email, hashedPassword, Role.ADMIN);
+        Admin admin = new Admin();
+        admin.setName("Main Administrator");
+        admin.setEmail(email);
+        admin.setPassword(hashedPassword);
+        admin.setRole(Role.ADMIN);
+        admin.setEnabled(true);
+
         adminRepository.save(admin);
-        log.info("Successfully bootstrapped initial administrator account: [{}]", email);
+        log.info("Successfully bootstrapped initial designated Main Admin account: [{}]", email);
     }
 }

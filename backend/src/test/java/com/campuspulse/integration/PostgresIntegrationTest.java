@@ -46,6 +46,12 @@ class PostgresIntegrationTest {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    @Autowired(required = false)
+    private com.campuspulse.repository.CoordinatorRequestRepository coordinatorRequestRepository;
+
+    @Autowired(required = false)
+    private com.campuspulse.repository.AuditLogRepository auditLogRepository;
+
     @Test
     @DisplayName("Persists, retrieves, updates, and deletes an Event in real PostgreSQL")
     void testEventLifecycleInPostgres() {
@@ -98,5 +104,39 @@ class PostgresIntegrationTest {
         assertThat(passwordEncoder.matches("SecretPass123!", found.get().getPassword())).isTrue();
 
         adminRepository.deleteById(saved.getId());
+    }
+
+    @Test
+    @DisplayName("Persists and verifies CoordinatorRequest and AuditLog in real PostgreSQL")
+    void testCoordinatorRequestAndAuditLogPersistenceInPostgres() {
+        String testEmail = "pg.user@campuspulse.edu";
+        Admin user = new Admin("PG User", testEmail, passwordEncoder.encode("SecretPass123!"), Role.USER);
+        user = adminRepository.save(user);
+
+        com.campuspulse.entity.CoordinatorRequest req = new com.campuspulse.entity.CoordinatorRequest(
+                user,
+                "PG Robotics Club",
+                "Hosting PG workshop",
+                "+919876543210"
+        );
+        com.campuspulse.entity.CoordinatorRequest savedReq = coordinatorRequestRepository.save(req);
+        assertThat(savedReq.getId()).isNotNull();
+        assertThat(savedReq.getStatus()).isEqualTo(com.campuspulse.entity.CoordinatorRequestStatus.PENDING);
+        assertThat(savedReq.getRequestedAt()).isNotNull();
+
+        com.campuspulse.entity.AuditLog log = new com.campuspulse.entity.AuditLog(
+                user.getEmail(),
+                "COORDINATOR_REQUEST_SUBMITTED",
+                "COORDINATOR_REQUEST",
+                savedReq.getId(),
+                "Integration test audit record on Postgres"
+        );
+        com.campuspulse.entity.AuditLog savedLog = auditLogRepository.save(log);
+        assertThat(savedLog.getId()).isNotNull();
+        assertThat(savedLog.getCreatedAt()).isNotNull();
+
+        coordinatorRequestRepository.deleteById(savedReq.getId());
+        auditLogRepository.deleteById(savedLog.getId());
+        adminRepository.deleteById(user.getId());
     }
 }

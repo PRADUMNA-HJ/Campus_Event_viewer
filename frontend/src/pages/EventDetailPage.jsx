@@ -138,6 +138,20 @@ export default function EventDetailPage() {
           <div className="event-detail__info-card" style={{ marginBottom: 'var(--space-6)' }}>
             <h3>About this Event</h3>
             <p className="event-detail__description">{event.description}</p>
+            {event.registrationUrl && (
+              <div style={{ marginTop: 'var(--space-6)' }}>
+                <a
+                  href={event.registrationUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn--primary"
+                  id="event-register-cta-btn"
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-2)' }}
+                >
+                  Register for this Event &rarr;
+                </a>
+              </div>
+            )}
           </div>
         </div>
 

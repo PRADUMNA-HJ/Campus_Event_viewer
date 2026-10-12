@@ -29,6 +29,7 @@ import java.util.List;
  */
 @Configuration
 @EnableWebSecurity
+@org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity(prePostEnabled = true)
 public class SecurityConfig {
 
     private final ObjectProvider<JwtAuthenticationFilter> jwtFilterProvider;
@@ -89,10 +90,11 @@ public class SecurityConfig {
      * - Disables CSRF for stateless REST operations.
      * - Configures explicit CORS handling.
      * - Enforces stateless session management.
-     * - Allows public access to POST /api/auth/login and GET /api/events/**.
-     * - Restricts GET /api/auth/me to authenticated administrators (ROLE_ADMIN).
-     * - Restricts mutating event endpoints (POST, PUT, DELETE) to authenticated administrators (ROLE_ADMIN).
-     * - Denies all other endpoints by default.
+     * - Allows public access to /api/auth/login, /api/auth/register, /api/health, and GET /api/events/**.
+     * - Allows authenticated accounts to access /api/auth/me and /api/coordinator-requests/**.
+     * - Restricts /api/admin/** to MAIN_ADMIN.
+     * - Restricts mutating event endpoints (POST, PUT, DELETE) to COORDINATOR and MAIN_ADMIN.
+     * - Denies unmapped endpoints by default.
      * - Integrates JWT authentication filter, entry point, and access denied handler.
      */
     @Bean
@@ -110,18 +112,23 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         // Public health check for cloud uptime monitoring
                         .requestMatchers(HttpMethod.GET, "/api/health").permitAll()
-                        // Public administrator login
-                        .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
-                        // Public read-only event discovery for students and visitors
-                        .requestMatchers(HttpMethod.GET, "/api/events", "/api/events/**").permitAll()
+                        // Public user registration and login
+                        .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/register").permitAll()
                         // Local development H2 Web Console
                         .requestMatchers("/h2-console/**").permitAll()
-                        // Authenticated admin profile
-                        .requestMatchers(HttpMethod.GET, "/api/auth/me").hasRole("ADMIN")
-                        // Protected admin event management endpoints
-                        .requestMatchers(HttpMethod.POST, "/api/events", "/api/events/**").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.PUT, "/api/events/**").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.DELETE, "/api/events/**").hasRole("ADMIN")
+                        // Authenticated profile & coordinator request endpoints
+                        .requestMatchers(HttpMethod.GET, "/api/auth/me").authenticated()
+                        .requestMatchers("/api/coordinator-requests", "/api/coordinator-requests/**").authenticated()
+                        // Coordinator personal events
+                        .requestMatchers(HttpMethod.GET, "/api/events/my").hasAnyRole("COORDINATOR", "MAIN_ADMIN", "ADMIN")
+                        // Public read-only event discovery for students and visitors
+                        .requestMatchers(HttpMethod.GET, "/api/events", "/api/events/**").permitAll()
+                        // Protected Main Admin endpoints
+                        .requestMatchers("/api/admin", "/api/admin/**").hasAnyRole("MAIN_ADMIN", "ADMIN")
+                        // Protected coordinator and admin event mutations
+                        .requestMatchers(HttpMethod.POST, "/api/events", "/api/events/**").hasAnyRole("COORDINATOR", "MAIN_ADMIN", "ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/events/**").hasAnyRole("COORDINATOR", "MAIN_ADMIN", "ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/events/**").hasAnyRole("COORDINATOR", "MAIN_ADMIN", "ADMIN")
                         // Deny all other routes by default
                         .anyRequest().denyAll()
                 )

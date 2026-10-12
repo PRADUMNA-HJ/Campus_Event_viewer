@@ -44,4 +44,37 @@ public interface AdminRepository extends JpaRepository<Admin, Long> {
      * @return true if an account exists with this email, false otherwise
      */
     boolean existsByEmailIgnoreCase(String email);
+
+    /**
+     * Finds accounts with a specific role.
+     *
+     * @param role the role to filter by
+     * @return list of matching accounts
+     */
+    java.util.List<Admin> findByRole(com.campuspulse.entity.Role role);
+
+    /**
+     * Finds accounts with a specific role, ordered by creation date descending.
+     *
+     * @param role the role to filter by
+     * @return list of matching accounts
+     */
+    java.util.List<Admin> findByRoleOrderByCreatedAtDesc(com.campuspulse.entity.Role role);
+
+    /**
+     * Counts the number of accounts with the specified role.
+     *
+     * @param role the role to count
+     * @return account count
+     */
+    long countByRole(com.campuspulse.entity.Role role);
+
+    /**
+     * Counts the number of accounts with any of the specified roles.
+     *
+     * @param roles collection of roles to match
+     * @return account count
+     */
+    long countByRoleIn(java.util.Collection<com.campuspulse.entity.Role> roles);
 }
+

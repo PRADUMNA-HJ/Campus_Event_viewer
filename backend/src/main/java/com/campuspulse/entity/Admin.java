@@ -19,7 +19,7 @@ import java.time.LocalDateTime;
 import java.util.Objects;
 
 /**
- * JPA Entity representing an administrator account in CampusPulse.
+ * JPA Entity representing a user or administrator account in CampusPulse.
  * Maps to the "admins" table in H2 (development) and PostgreSQL (production).
  * Stores credentials with a BCrypt password hash, never plain text.
  */
@@ -31,9 +31,13 @@ public class Admin {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Size(max = 100, message = "Name must not exceed 100 characters")
+    @Column(length = 100)
+    private String name;
+
     @NotBlank(message = "Admin email is required")
     @Email(message = "Admin email must be a valid email address")
-    @Size(max = 150, message = "Admin email must not exceed 150 characters")
+    @Size(max = 150, message = "Email must not exceed 150 characters")
     @Column(nullable = false, unique = true, length = 150)
     private String email;
 
@@ -45,6 +49,9 @@ public class Admin {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)
     private Role role = Role.ADMIN;
+
+    @Column(nullable = false)
+    private boolean enabled = true;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -58,14 +65,21 @@ public class Admin {
 
     // Convenience constructor with default ADMIN role
     public Admin(String email, String password) {
-        this(email, password, Role.ADMIN);
+        this(null, email, password, Role.ADMIN);
     }
 
-    // Full constructor
+    // Backward-compatible constructor
     public Admin(String email, String password, Role role) {
+        this(null, email, password, role);
+    }
+
+    // Full constructor including name and role
+    public Admin(String name, String email, String password, Role role) {
+        this.name = name;
         this.email = email;
         this.password = password;
         this.role = role != null ? role : Role.ADMIN;
+        this.enabled = true;
     }
 
     @PrePersist
@@ -81,6 +95,9 @@ public class Admin {
     @PreUpdate
     protected void onUpdate() {
         this.updatedAt = LocalDateTime.now();
+        if (this.email != null) {
+            this.email = this.email.trim().toLowerCase();
+        }
     }
 
     // Getters and Setters
@@ -90,6 +107,14 @@ public class Admin {
 
     public void setId(Long id) {
         this.id = id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
     }
 
     public String getEmail() {
@@ -114,6 +139,14 @@ public class Admin {
 
     public void setRole(Role role) {
         this.role = role;
+    }
+
+    public boolean isEnabled() {
+        return enabled;
+    }
+
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
     }
 
     public LocalDateTime getCreatedAt() {
@@ -152,8 +185,10 @@ public class Admin {
     public String toString() {
         return "Admin{" +
                 "id=" + id +
+                ", name='" + name + '\'' +
                 ", email='" + email + '\'' +
                 ", role=" + role +
+                ", enabled=" + enabled +
                 ", createdAt=" + createdAt +
                 ", updatedAt=" + updatedAt +
                 '}';

@@ -4,31 +4,9 @@ import { login as apiLogin, fetchCurrentAdmin } from '../services/api';
 /**
  * CampusPulse Authentication Context & Provider
  * 
- * Manages administrator authentication state, token persistence, and session verification.
- * 
- * -----------------------------------------------------------------------------------------
- * Security & Token Storage Architectural Note:
- * -----------------------------------------------------------------------------------------
- * The Spring Boot backend currently implements stateless JWT authentication returning
- * a Bearer token in the JSON response body (AdminLoginResponse) and requires the
- * `Authorization: Bearer <token>` header for protected endpoints (/api/auth/me,
- * POST/PUT/DELETE /api/events). It does not configure or set HttpOnly cookies.
- * 
- * Consequently, the frontend stores the bearer token in browser `localStorage`.
- * Security consideration:
- * - Any script executing within the document origin could theoretically access localStorage.
- *   This poses an XSS (Cross-Site Scripting) vulnerability surface if unsanitized user content
- *   were injected.
- * - In this release, user-supplied content is rendered safely via React's standard escaping,
- *   and no dynamic script injection is permitted.
- * - For future enterprise production deployments, refactoring the backend to issue
- *   a secure, HttpOnly, SameSite=Strict session cookie is recommended to eliminate
- *   token accessibility from JavaScript entirely.
- * 
- * Furthermore, frontend route guards are purely a UX affordance.
- * Spring Security's SecurityFilterChain with JwtAuthenticationFilter remains
- * the authoritative security boundary for all mutating operations.
- * -----------------------------------------------------------------------------------------
+ * Manages authentication state, token persistence, and session verification
+ * for regular users (ROLE_USER), coordinators (ROLE_COORDINATOR),
+ * and administrators (ROLE_MAIN_ADMIN).
  */
 
 const TOKEN_STORAGE_KEY = 'campuspulse_admin_token';
@@ -68,15 +46,41 @@ export function AuthProvider({ children }) {
     setUser(null);
   }, []);
 
+  // Refresh user profile directly from GET /api/auth/me
+  const refreshUser = useCallback(async () => {
+    if (!token) return null;
+    try {
+      const profile = await fetchCurrentAdmin(token);
+      if (profile.enabled === false) {
+        logout();
+        return null;
+      }
+      setUser(profile);
+      try {
+        localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(profile));
+      } catch {
+        // Ignore storage error
+      }
+      return profile;
+    } catch (error) {
+      if (error?.status === 401) {
+        console.warn('[CampusPulse] Session expired during profile refresh:', error.message);
+        logout();
+      }
+      return null;
+    }
+  }, [token, logout]);
+
   // Authenticate and store JWT
   const login = useCallback(async (email, password) => {
     const response = await apiLogin({ email, password });
     
-    // response is AdminLoginResponse { token, tokenType, expiresIn, email, role }
+    // response is { token, tokenType, expiresIn, email, role, name }
     const authToken = response.token;
     const initialUser = {
       email: response.email,
       role: response.role,
+      name: response.name || null,
     };
 
     try {
@@ -89,7 +93,7 @@ export function AuthProvider({ children }) {
     setToken(authToken);
     setUser(initialUser);
 
-    // Try fetching full profile from GET /api/auth/me to enrich user data
+    // Fetch full profile from GET /api/auth/me to enrich user data with coordinatorRequestStatus etc.
     try {
       const profile = await fetchCurrentAdmin(authToken);
       setUser(profile);
@@ -99,14 +103,13 @@ export function AuthProvider({ children }) {
         // Ignore storage error
       }
     } catch {
-      // If /me verification fails or backend does not respond, the initial user remains
+      // If /me call fails initially, fallback initialUser remains
     }
 
     return response;
   }, []);
 
   // Verify stored token on initial mount using GET /api/auth/me
-  // Never assume a token is valid merely because it exists in browser storage!
   useEffect(() => {
     let isMounted = true;
 
@@ -121,15 +124,18 @@ export function AuthProvider({ children }) {
       try {
         const profile = await fetchCurrentAdmin(token);
         if (isMounted) {
-          setUser(profile);
-          try {
-            localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(profile));
-          } catch {
-            // Ignore storage error
+          if (profile.enabled === false) {
+            logout();
+          } else {
+            setUser(profile);
+            try {
+              localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(profile));
+            } catch {
+              // Ignore storage error
+            }
           }
         }
       } catch (error) {
-        // If token is invalid or expired (401), clear the session safely
         console.warn('[CampusPulse] Session expired or invalid, clearing authentication:', error.message);
         if (isMounted) {
           logout();
@@ -148,6 +154,11 @@ export function AuthProvider({ children }) {
     };
   }, [token, logout]);
 
+  // Role helpers
+  const isMainAdmin = Boolean(user && (user.role === 'MAIN_ADMIN' || user.role === 'ADMIN'));
+  const isCoordinator = Boolean(user && user.role === 'COORDINATOR');
+  const isUser = Boolean(user && user.role === 'USER');
+
   const value = {
     token,
     user,
@@ -155,6 +166,10 @@ export function AuthProvider({ children }) {
     isLoading,
     login,
     logout,
+    refreshUser,
+    isMainAdmin,
+    isCoordinator,
+    isUser,
   };
 
   return (
@@ -166,14 +181,6 @@ export function AuthProvider({ children }) {
 
 /**
  * Custom hook to access the CampusPulse authentication context.
- * @returns {{
- *   token: string|null,
- *   user: {id?: number, email: string, role: string, createdAt?: string}|null,
- *   isAuthenticated: boolean,
- *   isLoading: boolean,
- *   login: (email: string, password: string) => Promise<Object>,
- *   logout: () => void
- * }}
  */
 export function useAuth() {
   const context = useContext(AuthContext);

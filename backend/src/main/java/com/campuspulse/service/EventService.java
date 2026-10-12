@@ -54,4 +54,39 @@ public interface EventService {
      * @throws com.campuspulse.exception.ResourceNotFoundException if event ID does not exist
      */
     void deleteEvent(Long id);
+
+    /**
+     * Creates an event with security context and ownership tracking.
+     */
+    EventResponse createEventWithPrincipal(EventCreateRequest request, String principalEmail);
+
+    /**
+     * Updates an event enforcing coordinator ownership and review lifecycle.
+     */
+    EventResponse updateEventWithPrincipal(Long id, EventCreateRequest request, String principalEmail);
+
+    /**
+     * Deletes an event enforcing coordinator ownership or admin privileges.
+     */
+    void deleteEventWithPrincipal(Long id, String principalEmail);
+
+    /**
+     * Retrieves all events created by the authenticated coordinator.
+     */
+    List<EventResponse> getMyCoordinatorEvents(String coordinatorEmail);
+
+    /**
+     * Retrieves all events regardless of status for Main Admin overview.
+     */
+    List<EventResponse> getAllEventsAdmin();
+
+    /**
+     * Publishes an event (Main Admin only).
+     */
+    EventResponse publishEvent(Long id, String adminEmail, String note);
+
+    /**
+     * Rejects an event submission (Main Admin only).
+     */
+    EventResponse rejectEvent(Long id, String adminEmail, String note);
 }

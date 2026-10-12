@@ -26,6 +26,12 @@ public class EventResponse {
     private String contactEmail;
     private String whatsappNumber;
     private String bannerUrl;
+    private String registrationUrl;
+    private Long createdById;
+    private String createdByName;
+    private Long reviewedById;
+    private LocalDateTime reviewedAt;
+    private String reviewNote;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -76,7 +82,7 @@ public class EventResponse {
         if (event == null) {
             return null;
         }
-        return new EventResponse(
+        EventResponse resp = new EventResponse(
                 event.getId(),
                 event.getTitle(),
                 event.getDescription(),
@@ -94,6 +100,17 @@ public class EventResponse {
                 event.getCreatedAt(),
                 event.getUpdatedAt()
         );
+        resp.setRegistrationUrl(event.getRegistrationUrl());
+        if (event.getCreatedBy() != null) {
+            resp.setCreatedById(event.getCreatedBy().getId());
+            resp.setCreatedByName(event.getCreatedBy().getName());
+        }
+        if (event.getReviewedBy() != null) {
+            resp.setReviewedById(event.getReviewedBy().getId());
+        }
+        resp.setReviewedAt(event.getReviewedAt());
+        resp.setReviewNote(event.getReviewNote());
+        return resp;
     }
 
     // Getters and Setters
@@ -207,6 +224,54 @@ public class EventResponse {
 
     public void setBannerUrl(String bannerUrl) {
         this.bannerUrl = bannerUrl;
+    }
+
+    public String getRegistrationUrl() {
+        return registrationUrl;
+    }
+
+    public void setRegistrationUrl(String registrationUrl) {
+        this.registrationUrl = registrationUrl;
+    }
+
+    public Long getCreatedById() {
+        return createdById;
+    }
+
+    public void setCreatedById(Long createdById) {
+        this.createdById = createdById;
+    }
+
+    public String getCreatedByName() {
+        return createdByName;
+    }
+
+    public void setCreatedByName(String createdByName) {
+        this.createdByName = createdByName;
+    }
+
+    public Long getReviewedById() {
+        return reviewedById;
+    }
+
+    public void setReviewedById(Long reviewedById) {
+        this.reviewedById = reviewedById;
+    }
+
+    public LocalDateTime getReviewedAt() {
+        return reviewedAt;
+    }
+
+    public void setReviewedAt(LocalDateTime reviewedAt) {
+        this.reviewedAt = reviewedAt;
+    }
+
+    public String getReviewNote() {
+        return reviewNote;
+    }
+
+    public void setReviewNote(String reviewNote) {
+        this.reviewNote = reviewNote;
     }
 
     public LocalDateTime getCreatedAt() {

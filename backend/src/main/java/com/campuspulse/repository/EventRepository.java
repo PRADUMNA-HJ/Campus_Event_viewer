@@ -103,4 +103,19 @@ public interface EventRepository extends JpaRepository<Event, Long> {
      * @return list of matching events
      */
     List<Event> findByOrganizerNameIgnoreCase(String organizerName);
+
+    /**
+     * Finds all events created by a specific coordinator/admin.
+     *
+     * @param createdBy the user who created the events
+     * @return list of matching events ordered chronologically
+     */
+    List<Event> findByCreatedByOrderByStartDateTimeAsc(com.campuspulse.entity.Admin createdBy);
+
+    /**
+     * Retrieves all events ordered chronologically by start date time.
+     *
+     * @return list of all events
+     */
+    List<Event> findAllByOrderByStartDateTimeAsc();
 }

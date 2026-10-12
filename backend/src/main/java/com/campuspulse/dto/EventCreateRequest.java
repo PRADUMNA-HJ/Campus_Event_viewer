@@ -58,6 +58,9 @@ public class EventCreateRequest {
     @Size(max = 500, message = "Banner URL must not exceed 500 characters")
     private String bannerUrl;
 
+    @Size(max = 500, message = "Registration URL must not exceed 500 characters")
+    private String registrationUrl;
+
     public EventCreateRequest() {
     }
 
@@ -192,5 +195,13 @@ public class EventCreateRequest {
 
     public void setBannerUrl(String bannerUrl) {
         this.bannerUrl = bannerUrl;
+    }
+
+    public String getRegistrationUrl() {
+        return registrationUrl;
+    }
+
+    public void setRegistrationUrl(String registrationUrl) {
+        this.registrationUrl = registrationUrl;
     }
 }

@@ -66,10 +66,25 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
                 if (adminOptional.isPresent()) {
                     Admin admin = adminOptional.get();
-                    String roleName = admin.getRole() != null ? admin.getRole().name() : "ADMIN";
-                    List<SimpleGrantedAuthority> authorities = List.of(
-                            new SimpleGrantedAuthority("ROLE_" + roleName)
-                    );
+
+                    if (!admin.isEnabled()) {
+                        SecurityContextHolder.clearContext();
+                        filterChain.doFilter(request, response);
+                        return;
+                    }
+
+                    String roleName = admin.getRole() != null ? admin.getRole().name() : "USER";
+                    List<SimpleGrantedAuthority> authorities;
+                    if (admin.getRole() == com.campuspulse.entity.Role.MAIN_ADMIN || admin.getRole() == com.campuspulse.entity.Role.ADMIN) {
+                        authorities = List.of(
+                                new SimpleGrantedAuthority("ROLE_MAIN_ADMIN"),
+                                new SimpleGrantedAuthority("ROLE_ADMIN")
+                        );
+                    } else {
+                        authorities = List.of(
+                                new SimpleGrantedAuthority("ROLE_" + roleName)
+                        );
+                    }
 
                     UsernamePasswordAuthenticationToken authToken =
                             new UsernamePasswordAuthenticationToken(admin.getEmail(), null, authorities);

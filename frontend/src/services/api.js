@@ -3,8 +3,15 @@
  * 
  * Centralized HTTP client communicating with the Spring Boot backend REST endpoints:
  * - Public: GET /api/events, GET /api/events/{id}
- * - Auth: POST /api/auth/login, GET /api/auth/me
- * - Protected Admin CRUD: POST /api/events, PUT /api/events/{id}, DELETE /api/events/{id}
+ * - Auth: POST /api/auth/login, POST /api/auth/register, GET /api/auth/me
+ * - Coordinator Requests: POST /api/coordinator-requests, GET /api/coordinator-requests/me
+ * - Coordinator Event CRUD: GET /api/events/my, POST /api/events, PUT /api/events/{id}, DELETE /api/events/{id}
+ * - Main Admin Governance:
+ *     GET /api/admin/coordinator-requests, POST /api/admin/coordinator-requests/{id}/approve,
+ *     POST /api/admin/coordinator-requests/{id}/reject, GET /api/admin/coordinators,
+ *     POST /api/admin/coordinators/{id}/revoke, GET /api/admin/events,
+ *     POST /api/admin/events/{id}/publish, POST /api/admin/events/{id}/reject,
+ *     DELETE /api/admin/events/{id}
  * 
  * Never logs credentials or JWT tokens.
  * Handles standardized ErrorResponse payloads and extracts validation errors.
@@ -48,12 +55,28 @@ async function handleResponseError(response) {
     if (response.status === 401) {
       errorMessage = 'Invalid email or password.';
     } else if (response.status === 403) {
-      errorMessage = 'Access denied. Administrator privileges required.';
+      errorMessage = 'Access denied. You do not have permission for this resource.';
     } else if (response.status === 404) {
       errorMessage = 'Resource not found.';
+    } else if (response.status === 409) {
+      errorMessage = 'Conflict: An existing resource or invalid state transition prevented this action.';
     }
   }
   throw new ApiError(errorMessage, response.status, validationErrors);
+}
+
+/**
+ * Helper to build auth headers.
+ */
+function authHeaders(token, extra = {}) {
+  const headers = {
+    'Accept': 'application/json',
+    ...extra,
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return headers;
 }
 
 /**
@@ -63,7 +86,7 @@ const MOCK_EVENTS = [
   {
     id: 1,
     title: 'Spring Hackathon 2026',
-    description: 'A 48-hour hackathon bringing together students from across campus to build innovative solutions. Teams of 2-4 will compete for prizes across categories including AI/ML, Web3, and Social Impact. Mentors from top tech companies will be available throughout the event.',
+    description: 'A 48-hour hackathon bringing together students from across campus to build innovative solutions. Teams of 2-4 will compete for prizes across categories including AI/ML, Web3, and Social Impact.',
     eventType: 'HACKATHON',
     status: 'PUBLISHED',
     location: 'Innovation Center, Building A',
@@ -75,13 +98,14 @@ const MOCK_EVENTS = [
     contactEmail: 'techsoc@campus.edu',
     whatsappNumber: '+919876543210',
     bannerUrl: null,
+    registrationUrl: 'https://hackathon.campus.edu/register',
     createdAt: '2026-10-01T10:00:00',
     updatedAt: '2026-10-01T10:00:00',
   },
   {
     id: 2,
     title: 'Full-Stack Development Workshop',
-    description: 'Intensive hands-on workshop covering React, Spring Boot, and PostgreSQL. Build a complete web application from scratch with industry best practices including CI/CD pipelines, testing strategies, and deployment to cloud platforms.',
+    description: 'Intensive hands-on workshop covering React, Spring Boot, and PostgreSQL. Build a complete web application from scratch with industry best practices.',
     eventType: 'WORKSHOP',
     status: 'PUBLISHED',
     location: 'Computer Lab 304',
@@ -93,13 +117,14 @@ const MOCK_EVENTS = [
     contactEmail: 'cloudclub@campus.edu',
     whatsappNumber: '+919876543211',
     bannerUrl: null,
+    registrationUrl: null,
     createdAt: '2026-10-02T10:00:00',
     updatedAt: '2026-10-02T10:00:00',
   },
   {
     id: 3,
     title: 'AI & Machine Learning Seminar',
-    description: 'Explore the latest breakthroughs in artificial intelligence and machine learning. Topics include transformer architectures, reinforcement learning, and ethical AI. Featuring guest speakers from Google DeepMind and OpenAI.',
+    description: 'Explore the latest breakthroughs in artificial intelligence and machine learning. Topics include transformer architectures, reinforcement learning, and ethical AI.',
     eventType: 'SEMINAR',
     status: 'PUBLISHED',
     location: 'Auditorium Hall, Main Block',
@@ -111,62 +136,9 @@ const MOCK_EVENTS = [
     contactEmail: 'ailab@campus.edu',
     whatsappNumber: null,
     bannerUrl: null,
+    registrationUrl: null,
     createdAt: '2026-10-03T10:00:00',
     updatedAt: '2026-10-03T10:00:00',
-  },
-  {
-    id: 4,
-    title: 'Cybersecurity CTF Challenge',
-    description: 'Capture the Flag competition testing your cybersecurity skills across web exploitation, binary analysis, cryptography, forensics, and network security. Open to all skill levels with beginner-friendly challenges.',
-    eventType: 'TECHNICAL',
-    status: 'PUBLISHED',
-    location: 'Networking Lab, Block C',
-    startDateTime: '2026-12-01T09:00:00',
-    endDateTime: '2026-12-01T21:00:00',
-    registrationDeadline: '2026-11-28T23:59:59',
-    maxCapacity: 100,
-    organizerName: 'CyberSec Club',
-    contactEmail: 'cybersec@campus.edu',
-    whatsappNumber: '+919876543212',
-    bannerUrl: null,
-    createdAt: '2026-10-04T10:00:00',
-    updatedAt: '2026-10-04T10:00:00',
-  },
-  {
-    id: 5,
-    title: 'Annual Cultural Fest — Pulse 2026',
-    description: 'The flagship cultural festival celebrating art, music, dance, and drama. Three days of performances, competitions, food stalls, and workshops. Featuring headline performances from indie bands and renowned artists.',
-    eventType: 'CULTURAL',
-    status: 'PUBLISHED',
-    location: 'Open Air Theatre & Campus Grounds',
-    startDateTime: '2026-12-10T16:00:00',
-    endDateTime: '2026-12-12T23:00:00',
-    registrationDeadline: '2026-12-08T23:59:59',
-    maxCapacity: 1000,
-    organizerName: 'Cultural Committee',
-    contactEmail: 'cultural@campus.edu',
-    whatsappNumber: '+919876543213',
-    bannerUrl: null,
-    createdAt: '2026-10-05T10:00:00',
-    updatedAt: '2026-10-05T10:00:00',
-  },
-  {
-    id: 6,
-    title: 'Blockchain & Web3 Guest Lecture',
-    description: 'A special guest lecture by industry pioneers exploring the future of decentralized applications, smart contracts, and the web3 ecosystem. Q&A session included with opportunities for internship referrals.',
-    eventType: 'GUEST_LECTURE',
-    status: 'PUBLISHED',
-    location: 'Seminar Hall 2, Block B',
-    startDateTime: '2026-12-05T15:00:00',
-    endDateTime: '2026-12-05T17:30:00',
-    registrationDeadline: '2026-12-04T23:59:59',
-    maxCapacity: 150,
-    organizerName: 'Blockchain Society',
-    contactEmail: 'blockchain@campus.edu',
-    whatsappNumber: null,
-    bannerUrl: null,
-    createdAt: '2026-10-06T10:00:00',
-    updatedAt: '2026-10-06T10:00:00',
   },
 ];
 
@@ -179,11 +151,13 @@ export function isUsingMockData() {
   return usingMockData;
 }
 
+/* ===================================================================
+   1. Public Discovery Endpoints
+   =================================================================== */
+
 /**
- * Fetches all upcoming events from the backend (Public).
+ * Fetches all upcoming published events (Public).
  * Falls back to mock data if the API is unavailable.
- * 
- * @returns {Promise<{events: Array, isMock: boolean}>}
  */
 export async function fetchEvents() {
   try {
@@ -198,10 +172,8 @@ export async function fetchEvents() {
     return { events, isMock: false };
   } catch (error) {
     if (error instanceof ApiError) {
-      // Backend responded with HTTP error code
       console.warn('[CampusPulse] Backend returned error for /events, falling back to mock data:', error.message);
     } else {
-      // Network unreachable
       console.warn('[CampusPulse] Backend API unavailable, using mock data:', error.message);
     }
     usingMockData = true;
@@ -210,11 +182,8 @@ export async function fetchEvents() {
 }
 
 /**
- * Fetches a single event by ID from the backend (Public).
+ * Fetches a single event by ID (Public).
  * Falls back to mock data if the API is unavailable.
- * 
- * @param {number|string} id - The event ID
- * @returns {Promise<{event: Object|null, isMock: boolean}>}
  */
 export async function fetchEventById(id) {
   try {
@@ -241,12 +210,45 @@ export async function fetchEventById(id) {
   }
 }
 
+/* ===================================================================
+   2. Authentication & Account Registration Endpoints
+   =================================================================== */
+
 /**
- * Authenticates administrator credentials.
+ * Registers a new regular user account (ROLE_USER only).
+ * POST /api/auth/register
+ */
+export async function register(userData) {
+  try {
+    const response = await fetch(`${API_BASE_URL}/auth/register`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify({
+        name: userData.name,
+        email: userData.email,
+        password: userData.password,
+      }),
+    });
+
+    if (!response.ok) {
+      await handleResponseError(response);
+    }
+
+    return await response.json();
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    throw new ApiError('Unable to connect to registration service. Please verify the backend is running.', 0);
+  }
+}
+
+/**
+ * Authenticates user or administrator credentials.
  * POST /api/auth/login
- * 
- * @param {{email: string, password: string}} credentials
- * @returns {Promise<{token: string, tokenType: string, expiresIn: number, email: string, role: string}>}
  */
 export async function login(credentials) {
   try {
@@ -276,11 +278,8 @@ export async function login(credentials) {
 }
 
 /**
- * Retrieves the profile of the currently authenticated administrator.
+ * Retrieves the profile of the currently authenticated account.
  * GET /api/auth/me
- * 
- * @param {string} token - JWT bearer token
- * @returns {Promise<{id: number, email: string, role: string, createdAt: string}>}
  */
 export async function fetchCurrentAdmin(token) {
   if (!token) {
@@ -289,10 +288,7 @@ export async function fetchCurrentAdmin(token) {
 
   try {
     const response = await fetch(`${API_BASE_URL}/auth/me`, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Accept': 'application/json',
-      },
+      headers: authHeaders(token),
     });
 
     if (!response.ok) {
@@ -308,13 +304,110 @@ export async function fetchCurrentAdmin(token) {
   }
 }
 
+/* ===================================================================
+   3. Coordinator Access Request Endpoints
+   =================================================================== */
+
 /**
- * Creates a new event (Admin only).
+ * Submits a coordinator access request on behalf of the current user.
+ * POST /api/coordinator-requests
+ */
+export async function submitCoordinatorRequest(data, token) {
+  if (!token) {
+    throw new ApiError('Authentication required to submit coordinator request.', 401);
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/coordinator-requests`, {
+      method: 'POST',
+      headers: authHeaders(token, { 'Content-Type': 'application/json' }),
+      body: JSON.stringify({
+        organizationOrClub: data.organizationOrClub,
+        reason: data.reason,
+        contactDetails: data.contactDetails || null,
+      }),
+    });
+
+    if (!response.ok) {
+      await handleResponseError(response);
+    }
+
+    return await response.json();
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    throw new ApiError('Unable to connect to server to submit request.', 0);
+  }
+}
+
+/**
+ * Retrieves the current user's coordinator request status.
+ * GET /api/coordinator-requests/me
+ */
+export async function fetchMyCoordinatorRequest(token) {
+  if (!token) {
+    throw new ApiError('Authentication required to check request status.', 401);
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/coordinator-requests/me`, {
+      headers: authHeaders(token),
+    });
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        return null;
+      }
+      await handleResponseError(response);
+    }
+
+    return await response.json();
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) {
+      return null;
+    }
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    throw new ApiError('Unable to retrieve coordinator request status.', 0);
+  }
+}
+
+/* ===================================================================
+   4. Coordinator Event Management Endpoints
+   =================================================================== */
+
+/**
+ * Lists events created by the authenticated coordinator.
+ * GET /api/events/my
+ */
+export async function fetchMyEvents(token) {
+  if (!token) {
+    throw new ApiError('Authentication required to fetch coordinator events.', 401);
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/events/my`, {
+      headers: authHeaders(token),
+    });
+
+    if (!response.ok) {
+      await handleResponseError(response);
+    }
+
+    return await response.json();
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    throw new ApiError('Unable to connect to server to load your events.', 0);
+  }
+}
+
+/**
+ * Creates a new event (Coordinator / Admin).
  * POST /api/events
- * 
- * @param {Object} eventData - Matches EventCreateRequest DTO
- * @param {string} token - JWT bearer token
- * @returns {Promise<Object>} Created EventResponse
  */
 export async function createEvent(eventData, token) {
   if (!token) {
@@ -324,11 +417,7 @@ export async function createEvent(eventData, token) {
   try {
     const response = await fetch(`${API_BASE_URL}/events`, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
+      headers: authHeaders(token, { 'Content-Type': 'application/json' }),
       body: JSON.stringify(eventData),
     });
 
@@ -346,13 +435,8 @@ export async function createEvent(eventData, token) {
 }
 
 /**
- * Updates an existing event (Admin only).
+ * Updates an existing event (Coordinator / Admin).
  * PUT /api/events/{id}
- * 
- * @param {number|string} id - Event ID
- * @param {Object} eventData - Matches EventCreateRequest DTO
- * @param {string} token - JWT bearer token
- * @returns {Promise<Object>} Updated EventResponse
  */
 export async function updateEvent(id, eventData, token) {
   if (!token) {
@@ -362,11 +446,7 @@ export async function updateEvent(id, eventData, token) {
   try {
     const response = await fetch(`${API_BASE_URL}/events/${id}`, {
       method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
+      headers: authHeaders(token, { 'Content-Type': 'application/json' }),
       body: JSON.stringify(eventData),
     });
 
@@ -384,12 +464,8 @@ export async function updateEvent(id, eventData, token) {
 }
 
 /**
- * Deletes an event by ID (Admin only).
+ * Deletes an event by ID (Coordinator own / Admin any).
  * DELETE /api/events/{id}
- * 
- * @param {number|string} id - Event ID
- * @param {string} token - JWT bearer token
- * @returns {Promise<boolean>} True if deletion succeeded
  */
 export async function deleteEvent(id, token) {
   if (!token) {
@@ -399,9 +475,7 @@ export async function deleteEvent(id, token) {
   try {
     const response = await fetch(`${API_BASE_URL}/events/${id}`, {
       method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
+      headers: authHeaders(token),
     });
 
     if (!response.ok) {
@@ -414,5 +488,291 @@ export async function deleteEvent(id, token) {
       throw error;
     }
     throw new ApiError('Unable to connect to server to delete event.', 0);
+  }
+}
+
+/* ===================================================================
+   5. Main Admin Management & Moderation Endpoints
+   =================================================================== */
+
+/**
+ * Lists coordinator requests (Main Admin).
+ * GET /api/admin/coordinator-requests
+ */
+export async function fetchCoordinatorRequests(status, token) {
+  if (!token) {
+    throw new ApiError('Authentication required to view coordinator requests.', 401);
+  }
+
+  const query = status ? `?status=${encodeURIComponent(status)}` : '';
+  try {
+    const response = await fetch(`${API_BASE_URL}/admin/coordinator-requests${query}`, {
+      headers: authHeaders(token),
+    });
+
+    if (!response.ok) {
+      await handleResponseError(response);
+    }
+
+    return await response.json();
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    throw new ApiError('Unable to connect to server to load coordinator requests.', 0);
+  }
+}
+
+/**
+ * Gets a specific coordinator request by ID (Main Admin).
+ * GET /api/admin/coordinator-requests/{id}
+ */
+export async function fetchCoordinatorRequestById(id, token) {
+  if (!token) {
+    throw new ApiError('Authentication required.', 401);
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/admin/coordinator-requests/${id}`, {
+      headers: authHeaders(token),
+    });
+
+    if (!response.ok) {
+      await handleResponseError(response);
+    }
+
+    return await response.json();
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    throw new ApiError('Unable to load coordinator request details.', 0);
+  }
+}
+
+/**
+ * Approves a coordinator request (Main Admin).
+ * POST /api/admin/coordinator-requests/{id}/approve
+ */
+export async function approveCoordinatorRequest(id, token, reviewDto = {}) {
+  if (!token) {
+    throw new ApiError('Authentication required to approve requests.', 401);
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/admin/coordinator-requests/${id}/approve`, {
+      method: 'POST',
+      headers: authHeaders(token, { 'Content-Type': 'application/json' }),
+      body: JSON.stringify(reviewDto),
+    });
+
+    if (!response.ok) {
+      await handleResponseError(response);
+    }
+
+    return await response.json();
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    throw new ApiError('Unable to connect to server to approve request.', 0);
+  }
+}
+
+/**
+ * Rejects a coordinator request (Main Admin).
+ * POST /api/admin/coordinator-requests/{id}/reject
+ */
+export async function rejectCoordinatorRequest(id, token, reviewDto = {}) {
+  if (!token) {
+    throw new ApiError('Authentication required to reject requests.', 401);
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/admin/coordinator-requests/${id}/reject`, {
+      method: 'POST',
+      headers: authHeaders(token, { 'Content-Type': 'application/json' }),
+      body: JSON.stringify(reviewDto),
+    });
+
+    if (!response.ok) {
+      await handleResponseError(response);
+    }
+
+    return await response.json();
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    throw new ApiError('Unable to connect to server to reject request.', 0);
+  }
+}
+
+/**
+ * Lists all active coordinators (Main Admin).
+ * GET /api/admin/coordinators
+ */
+export async function fetchCoordinators(token) {
+  if (!token) {
+    throw new ApiError('Authentication required to list coordinators.', 401);
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/admin/coordinators`, {
+      headers: authHeaders(token),
+    });
+
+    if (!response.ok) {
+      await handleResponseError(response);
+    }
+
+    return await response.json();
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    throw new ApiError('Unable to load coordinator roster.', 0);
+  }
+}
+
+/**
+ * Revokes coordinator privileges (Main Admin).
+ * POST /api/admin/coordinators/{id}/revoke
+ */
+export async function revokeCoordinator(id, token, reason = null) {
+  if (!token) {
+    throw new ApiError('Authentication required to revoke coordinator privileges.', 401);
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/admin/coordinators/${id}/revoke`, {
+      method: 'POST',
+      headers: authHeaders(token, { 'Content-Type': 'application/json' }),
+      body: JSON.stringify(reason ? { reason } : {}),
+    });
+
+    if (!response.ok) {
+      await handleResponseError(response);
+    }
+
+    return await response.json();
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    throw new ApiError('Unable to revoke coordinator privileges.', 0);
+  }
+}
+
+/**
+ * Lists all events across all lifecycle statuses (Main Admin).
+ * GET /api/admin/events
+ */
+export async function fetchAllEventsAdmin(token) {
+  if (!token) {
+    throw new ApiError('Authentication required to view all events.', 401);
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/admin/events`, {
+      headers: authHeaders(token),
+    });
+
+    if (!response.ok) {
+      await handleResponseError(response);
+    }
+
+    return await response.json();
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    throw new ApiError('Unable to connect to server to load administrator events.', 0);
+  }
+}
+
+/**
+ * Publishes an event submission (Main Admin).
+ * POST /api/admin/events/{id}/publish
+ */
+export async function publishEventAdmin(id, token, note = null) {
+  if (!token) {
+    throw new ApiError('Authentication required to publish events.', 401);
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/admin/events/${id}/publish`, {
+      method: 'POST',
+      headers: authHeaders(token, { 'Content-Type': 'application/json' }),
+      body: JSON.stringify(note ? { note } : {}),
+    });
+
+    if (!response.ok) {
+      await handleResponseError(response);
+    }
+
+    return await response.json();
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    throw new ApiError('Unable to publish event.', 0);
+  }
+}
+
+/**
+ * Rejects an event submission (Main Admin).
+ * POST /api/admin/events/{id}/reject
+ */
+export async function rejectEventAdmin(id, token, note = null) {
+  if (!token) {
+    throw new ApiError('Authentication required to reject events.', 401);
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/admin/events/${id}/reject`, {
+      method: 'POST',
+      headers: authHeaders(token, { 'Content-Type': 'application/json' }),
+      body: JSON.stringify(note ? { note } : {}),
+    });
+
+    if (!response.ok) {
+      await handleResponseError(response);
+    }
+
+    return await response.json();
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    throw new ApiError('Unable to reject event.', 0);
+  }
+}
+
+/**
+ * Deletes any event (Main Admin).
+ * DELETE /api/admin/events/{id}
+ */
+export async function deleteEventAdmin(id, token) {
+  if (!token) {
+    throw new ApiError('Authentication required to delete events.', 401);
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/admin/events/${id}`, {
+      method: 'DELETE',
+      headers: authHeaders(token),
+    });
+
+    if (!response.ok) {
+      await handleResponseError(response);
+    }
+
+    return true;
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    throw new ApiError('Unable to delete event.', 0);
   }
 }

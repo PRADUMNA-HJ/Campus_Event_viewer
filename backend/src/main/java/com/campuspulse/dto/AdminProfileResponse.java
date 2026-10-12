@@ -9,8 +9,11 @@ import java.time.LocalDateTime;
 public class AdminProfileResponse {
 
     private Long id;
+    private String name;
     private String email;
     private String role;
+    private boolean enabled = true;
+    private String coordinatorRequestStatus;
     private LocalDateTime createdAt;
 
     public AdminProfileResponse() {
@@ -23,12 +26,46 @@ public class AdminProfileResponse {
         this.createdAt = createdAt;
     }
 
+    public AdminProfileResponse(Long id, String name, String email, String role, boolean enabled, String coordinatorRequestStatus, LocalDateTime createdAt) {
+        this.id = id;
+        this.name = name;
+        this.email = email;
+        this.role = role;
+        this.enabled = enabled;
+        this.coordinatorRequestStatus = coordinatorRequestStatus;
+        this.createdAt = createdAt;
+    }
+
     public Long getId() {
         return id;
     }
 
     public void setId(Long id) {
         this.id = id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public boolean isEnabled() {
+        return enabled;
+    }
+
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
+    }
+
+    public String getCoordinatorRequestStatus() {
+        return coordinatorRequestStatus;
+    }
+
+    public void setCoordinatorRequestStatus(String coordinatorRequestStatus) {
+        this.coordinatorRequestStatus = coordinatorRequestStatus;
     }
 
     public String getEmail() {

@@ -7,6 +7,7 @@ WORKDIR /app
 # Cache Maven dependencies
 COPY .mvn/ .mvn/
 COPY mvnw pom.xml ./
+RUN sed -i 's/\r$//' ./mvnw && chmod +x ./mvnw
 RUN ./mvnw dependency:go-offline -B
 
 # Compile and package application (tests skipped in container build)

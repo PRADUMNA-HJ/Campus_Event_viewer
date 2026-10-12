@@ -42,78 +42,193 @@
 
 ---
 
-## API & Security Endpoint Access Policy
+## Role-Based Access Control (RBAC) Architecture
 
-All endpoints follow a strict, least-privilege security model enforced by `SecurityFilterChain`. All unrecognized routes are denied by default.
+CampusPulse enforces a secure, three-tier role-based access model with strict server-side authorization:
 
-| HTTP Method | Endpoint | Access Level | Description |
-| :--- | :--- | :--- | :--- |
-| **GET** | `/api/health` | **Public** | Uptime & container liveness health check probe |
-| **GET** | `/api/events` | **Public** | List all upcoming published events |
-| **GET** | `/api/events/{id}` | **Public** | Retrieve details for a single event |
-| **POST** | `/api/auth/login` | **Public** | Authenticate administrator & issue JWT |
-| **GET** | `/api/auth/me` | **Admin (`ROLE_ADMIN`)** | Retrieve current administrator safe profile |
-| **POST** | `/api/events` | **Admin (`ROLE_ADMIN`)** | Create a new campus event |
-| **PUT** | `/api/events/{id}` | **Admin (`ROLE_ADMIN`)** | Update an existing campus event |
-| **DELETE** | `/api/events/{id}` | **Admin (`ROLE_ADMIN`)** | Remove a campus event |
-| **OPTIONS**| `/**` | **Public** | CORS preflight verification |
-| **ALL** | `/h2-console/**` | **Dev Only** | Local development database console |
-| **ALL** | *Any other route* | **Denied** | Denied by default (`anyRequest().denyAll()`) |
+1. **`ROLE_MAIN_ADMIN`**
+   - Exactly one designated initial Main Admin (single Main Admin policy).
+   - Approves or rejects campus coordinator requests.
+   - Immediately revokes coordinator privileges at any time.
+   - Publishes, rejects, and manages all events across all statuses.
+2. **`ROLE_COORDINATOR`**
+   - Represents student club presidents, department leads, and chapter organizers.
+   - Can create events (which unconditionally start in `PENDING_REVIEW`).
+   - Can update and delete only events they created (enforced strictly via server-side principal ownership).
+   - Significant edits to already published events automatically return the event to `PENDING_REVIEW` for re-approval.
+   - Cannot publish their own events or approve coordinator requests.
+3. **`ROLE_USER`**
+   - Regular campus students and members.
+   - Can register publicly (`POST /api/auth/register`) — public registration always assigns `ROLE_USER`.
+   - Can submit a coordinator privileges request (`POST /api/coordinator-requests`) and monitor their request status (`GET /api/coordinator-requests/me`).
+   - Cannot assign themselves privileged roles or manage events.
+4. **Public Visitors (Unauthenticated)**
+   - Can freely browse published, non-expired upcoming events (`GET /api/events`, `GET /api/events/{id}`).
+   - Non-published events (`DRAFT`, `PENDING_REVIEW`, `REJECTED`) are strictly invisible to public visitors.
+
+### Immediate Server-Side Revocation Guarantee
+
+To ensure tokens cannot be abused after privilege changes:
+- `JwtAuthenticationFilter` performs a live server-side lookup on every authenticated request.
+- The effective role and `enabled` status are resolved directly from the fresh database entity rather than stale JWT claims.
+- If a coordinator is revoked, their database role is immediately set to `ROLE_USER`. Their very next request is evaluated as `ROLE_USER` — even if they present an unexpired JWT generated before revocation.
+- Disabled accounts (`enabled = false`) are rejected immediately, terminating API access in real time.
+
+---
+
+## Coordinator Request & Event Approval Lifecycles
+
+### 1. Coordinator Request Lifecycle
+```text
+[ Regular User (ROLE_USER) ]
+           │
+           │ POST /api/coordinator-requests (single pending request enforced)
+           ▼
+     [ PENDING ]
+        │      │
+        │      └──────────────────────────┐
+        │ POST /approve (Main Admin)      │ POST /reject (Main Admin)
+        ▼                                 ▼
+   [ APPROVED ]                      [ REJECTED ]
+(User promoted to                   (User remains
+ ROLE_COORDINATOR)                    ROLE_USER)
+        │
+        │ POST /api/admin/coordinators/{id}/revoke (Main Admin)
+        ▼
+   [ REVOKED ]
+(User returned to ROLE_USER;
+ immediate server-side revocation)
+```
+
+### 2. Event Approval Lifecycle
+```text
+[ Coordinator (ROLE_COORDINATOR) ]
+           │
+           │ POST /api/events (createdBy derived from Principal)
+           ▼
+   [ PENDING_REVIEW ] ◄────────────────────────────────────┐
+        │      │                                            │
+        │      └───────────────────────┐                    │ Significant coordinator
+        │ POST /publish (Main Admin)   │ POST /reject       │ update to published event
+        ▼                              ▼                    │
+   [ PUBLISHED ]                  [ REJECTED ]              │
+        │                                                   │
+        └───────────────────────────────────────────────────┘
+```
+- **Expired Event Rule**: Events whose `startDateTime` has passed are excluded from the public upcoming events list (`GET /api/events`) but remain preserved in the database and accessible via direct lookup or administrative archive.
+
+---
+
+## REST API Specification
+
+### Public Endpoints (No Authentication)
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| **GET** | `/api/health` | Uptime & container liveness health probe |
+| **GET** | `/api/events` | List all published, non-expired upcoming events |
+| **GET** | `/api/events/{id}` | Fetch individual event (only if published & viewable) |
+| **POST** | `/api/auth/login` | Authenticate account and receive JWT access token |
+| **POST** | `/api/auth/register` | Register new student account (always creates `ROLE_USER`) |
+
+### Authenticated Account Endpoints (Any Logged-in User)
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| **GET** | `/api/auth/me` | Safe user profile, effective role, and coordinator request status |
+| **POST** | `/api/coordinator-requests` | Submit coordinator privileges request (status `PENDING`) |
+| **GET** | `/api/coordinator-requests/me`| Retrieve latest coordinator request status |
+
+### Coordinator Endpoints (`ROLE_COORDINATOR` / `ROLE_MAIN_ADMIN`)
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| **GET** | `/api/events/my` | List events created by the authenticated coordinator |
+| **POST** | `/api/events` | Create new event submission (status forced to `PENDING_REVIEW`) |
+| **PUT** | `/api/events/{id}` | Update own event (returns published events to `PENDING_REVIEW`) |
+| **DELETE**| `/api/events/{id}` | Delete own event (ownership verified against Principal) |
+
+### Main Admin Endpoints (`ROLE_MAIN_ADMIN`)
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| **GET** | `/api/admin/coordinator-requests` | List coordinator requests (supports `?status=PENDING`) |
+| **GET** | `/api/admin/coordinator-requests/{id}` | View detailed coordinator request with requester info |
+| **POST** | `/api/admin/coordinator-requests/{id}/approve` | Approve request, elevating user to `ROLE_COORDINATOR` |
+| **POST** | `/api/admin/coordinator-requests/{id}/reject` | Reject coordinator request (user remains `ROLE_USER`) |
+| **GET** | `/api/admin/coordinators` | List all active campus coordinators |
+| **POST** | `/api/admin/coordinators/{id}/revoke` | Revoke coordinator access immediately (reverts to `ROLE_USER`) |
+| **GET** | `/api/admin/events` | View all events across all statuses (`PENDING_REVIEW`, etc.) |
+| **POST** | `/api/admin/events/{id}/publish` | Publish an event submission to public visibility |
+| **POST** | `/api/admin/events/{id}/reject` | Reject an event submission with administrative feedback note |
+| **DELETE**| `/api/admin/events/{id}` | Delete any event |
 
 ---
 
 ## Environment Variables & Configuration
 
-Configure these environment variables in your local shell or production deployment orchestrator (Docker, Kubernetes, Cloud Run, Heroku):
+Configure these environment variables in your deployment environment:
 
 | Variable | Description | Local Dev Default | Production Example |
 | :--- | :--- | :--- | :--- |
-| `PORT` | Server listening port (auto-assigned by Render, Railway, Fly.io, Cloud Run) | `8080` | `10000` |
-| `SPRING_PROFILES_ACTIVE` | Active Spring profile (`default`, `postgres`, or `prod`) | `default` (H2 file) | `prod` |
-| `SPRING_DATASOURCE_URL` | Full JDBC database URL (overrides DB_HOST/PORT/NAME) | `jdbc:h2:file:./data/campuspulse_db...` | `jdbc:postgresql://postgres.internal:5432/campuspulse_prod` |
-| `SPRING_DATASOURCE_USERNAME` | Database username (overrides DB_USER) | `sa` | `app_user` |
-| `SPRING_DATASOURCE_PASSWORD` | Database password (overrides DB_PASSWORD) | *(Empty)* | Secure DB password |
-| `DB_HOST` | PostgreSQL database host | `localhost` | `postgres-service.internal` |
-| `DB_PORT` | PostgreSQL database port | `5432` | `5432` |
-| `DB_NAME` | PostgreSQL database name | `campuspulse_db` | `campuspulse_prod` |
-| `DB_USER` | PostgreSQL username | `postgres` | `app_user` |
-| `DB_PASSWORD` | PostgreSQL password | *(Empty)* | Secure database password |
-| `DB_POOL_MAX_SIZE` | HikariCP maximum connection pool size | `10` | `15` |
-| `DB_POOL_MIN_IDLE` | HikariCP minimum idle connections | `2` | `5` |
-| `SPRING_JPA_HIBERNATE_DDL_AUTO` | Hibernate schema mode (`update` dev, `validate` prod) | `update` | `validate` |
-| `JWT_SECRET` | 256-bit+ HMAC-SHA key for signing and verifying tokens | Built-in development key | High-entropy 64+ char random string |
-| `JWT_EXPIRATION_MS` | Token validity duration in milliseconds | `86400000` (24 hours) | `86400000` |
-| `CORS_ALLOWED_ORIGINS` | Comma-separated list of permitted frontend origins | `http://localhost:5173,http://localhost:3000` | `https://campuspulse-frontend.onrender.com` |
-| `ADMIN_BOOTSTRAP_EMAIL` | Email for automatic initial admin creation on boot | *(Empty - bootstrap skipped)* | `admin@campuspulse.edu` |
-| `ADMIN_BOOTSTRAP_PASSWORD` | Password for automatic initial admin creation | *(Empty - bootstrap skipped)* | Strong unique password |
-| `VITE_API_BASE_URL` | Frontend REST API base endpoint (Vite client build-time) | `http://localhost:8080/api` | `https://campuspulse-backend.onrender.com/api` |
+| `CAMPUSPULSE_ADMIN_EMAIL` | Designated Main Admin email for initial bootstrap | *(Empty)* | `admin@campuspulse.edu` |
+| `CAMPUSPULSE_ADMIN_PASSWORD` | Designated Main Admin password for initial bootstrap | *(Empty)* | Strong unique password |
+| `PORT` | Server listening port (auto-assigned by host) | `8080` | `10000` |
+| `SPRING_PROFILES_ACTIVE` | Active Spring profile (`default` for H2, `postgres` for Prod) | `default` | `postgres` |
+| `SPRING_DATASOURCE_URL` | PostgreSQL JDBC connection URL | H2 file database | `jdbc:postgresql://postgres.internal:5432/campuspulse_db` |
+| `SPRING_DATASOURCE_USERNAME` | PostgreSQL database username | `sa` | `app_user` |
+| `SPRING_DATASOURCE_PASSWORD` | PostgreSQL database password | *(Empty)* | Secure DB password |
+| `JWT_SECRET` | 256-bit+ HMAC-SHA signing secret key | Development key | High-entropy 64+ char random string |
+| `JWT_EXPIRATION_MS` | JWT validity duration in milliseconds | `86400000` (24h) | `86400000` |
+| `CORS_ALLOWED_ORIGINS` | Permitted frontend origins (comma-separated) | `http://localhost:5173` | `https://campuspulse.onrender.com` |
 
 ---
 
-## Initial Administrator Bootstrap Procedure
+## Main Admin Bootstrap Procedure
 
-Public admin self-registration is deliberately disabled for security. Initial administrator accounts are provisioned safely using environment variables:
+Public administrator registration is intentionally disabled. Initial Main Admin setup is safe, server-side, and idempotent:
 
-1. **Set the environment variables before starting the application:**
+1. **Configure Environment Variables:**
    - **PowerShell (Windows):**
      ```powershell
-     $env:ADMIN_BOOTSTRAP_EMAIL="admin@campuspulse.edu"
-     $env:ADMIN_BOOTSTRAP_PASSWORD="SecureAdminPassword!2026"
+     $env:CAMPUSPULSE_ADMIN_EMAIL="admin@campuspulse.edu"
+     $env:CAMPUSPULSE_ADMIN_PASSWORD="SecureAdminPassword!2026"
      ```
-   - **Bash / Linux / macOS:**
+   - **Bash / Linux / Cloud Host:**
      ```bash
-     export ADMIN_BOOTSTRAP_EMAIL="admin@campuspulse.edu"
-     export ADMIN_BOOTSTRAP_PASSWORD="SecureAdminPassword!2026"
+     export CAMPUSPULSE_ADMIN_EMAIL="admin@campuspulse.edu"
+     export CAMPUSPULSE_ADMIN_PASSWORD="SecureAdminPassword!2026"
      ```
-2. **Start the application:**
-   ```powershell
-   .\mvnw.cmd spring-boot:run
-   ```
-3. **Idempotent Execution:**
-   - On startup, `AdminBootstrapRunner` checks if an account with `ADMIN_BOOTSTRAP_EMAIL` already exists.
-   - If not found, it hashes the password with BCrypt and creates the admin with `ROLE_ADMIN`.
-   - If the account already exists, the bootstrap process logs an informational message and skips execution without modifying existing records or passwords.
-   - If the variables are blank or omitted, bootstrap is safely skipped.
+2. **Launch Application:**
+   On startup, `AdminBootstrapRunner` checks if a designated Main Admin already exists:
+   - If none exists, it hashes the password with BCrypt and provisions the initial Main Admin.
+   - If a Main Admin already exists, bootstrap safely skips to preserve existing credentials.
+   - It will **never** silently promote an existing ordinary account.
+   - Passwords and secrets are **never** logged to application logs.
+
+---
+
+## Database Migration & PostgreSQL Setup
+
+For PostgreSQL production deployment:
+1. Provision a PostgreSQL 12+ database.
+2. Execute the idempotent schema script [`schema-postgres.sql`](file:///c:/Users/Hp/OneDrive/Desktop/Campus_pulse/backend/src/main/resources/schema-postgres.sql).
+3. The script creates tables `admins`, `events`, `coordinator_requests`, and `audit_logs` with proper indexes, constraints, and cascade settings.
+4. In production, configure `spring.jpa.hibernate.ddl-auto=update` or `validate`. Never use `create` or `create-drop` in production.
+
+---
+
+## Running Backend Tests
+
+Run all unit, repository, service, and security integration tests using Maven Wrapper:
+
+```powershell
+cd backend
+.\mvnw.cmd test
+```
+
+**Verified Test Results:**
+- **Total Tests Run**: 166
+- **Passed**: 163
+- **Failures**: 0
+- **Errors**: 0
+- **Skipped**: 3 (Live remote PostgreSQL tests conditionally skipped when local Docker/remote PostgreSQL environment variable `POSTGRES_TEST_ENABLED` is omitted)
 
 ---
 
@@ -530,11 +645,72 @@ Run against local, staging, or production backend:
 
 ---
 
-## Known Limitations & Production Tasks
+## Frontend Architecture & Multi-Role Pages (Part 2)
 
-1. **Free Tier Cold Starts**: Free cloud hosting instances (Render free tier, Neon auto-suspend) pause on inactivity. Production enterprise deployments should use persistent paid instances or keep-alive cron jobs.
-2. **JWT Storage**: Current architecture stores Bearer tokens in `localStorage`. For banking-grade security compliance, transition to `HttpOnly`, `SameSite=Strict` cookies.
-3. **Banner Uploads**: Banner images accept external HTTPS image URLs. A future cloud migration phase can add an AWS S3 / Cloudflare R2 presigned URL direct-upload pipeline.
-4. **Student Registrations**: Public browsing and external contact links (WhatsApp, email) are implemented; native multi-role student accounts can be provisioned in future feature iterations.
+CampusPulse provides three integrated user experiences across desktop, tablet, and mobile:
+
+### 1. Public Visitor Experience (No Login Required)
+- **`/` (Home)**: Real-time discovery feed of published, upcoming campus events and hackathons with search, category filters, and empty/error states.
+- **`/events/:id` (Event Details)**: Complete schedule, venue, attendee limits, organizer contacts, and direct registration links opened safely (`target="_blank" rel="noopener noreferrer"`).
+- **`/about`**: CampusPulse mission, community guidelines, and platform overview.
+
+### 2. Regular Student Experience (`ROLE_USER`)
+- **`/register`**: Student registration assigning strictly `ROLE_USER` (no role selector). Client and server validation.
+- **`/login`**: Universal login with smart role-based redirection.
+- **`/coordinator/request`**: Application form for student club leads to request coordinator privileges with club name and responsibilities. Single pending application enforced.
+- **`/coordinator/status`**: Dynamic status tracking for `PENDING`, `APPROVED`, `REJECTED`, and `REVOKED` states, including admin review notes and resubmission options.
+
+### 3. Approved Coordinator Experience (`ROLE_COORDINATOR`)
+- **`/coordinator/dashboard`**: Control center showing live metrics (My Events, Pending, Published, Rejected), search/filtering, review notes for rejected submissions, and event deletion with confirmation modal.
+- **`/coordinator/events/new`**: Submission form placing new events into `PENDING_REVIEW` for Main Admin approval.
+- **`/coordinator/events/:id/edit`**: Event editing. Significant updates to published events automatically reset status to `PENDING_REVIEW`.
+
+### 4. Main Admin Experience (`ROLE_MAIN_ADMIN`)
+- **`/admin/dashboard`**: Unified control center with three operational tabs:
+  - **Tab 1: All Events & Moderation**: Real-time moderation table. One-click publishing, rejection with optional review feedback note, edit any event, delete any event.
+  - **Tab 2: Coordinator Requests**: Review queue for student organizer applications. One-click approval promoting user to `ROLE_COORDINATOR`, or rejection with review note.
+  - **Tab 3: Active Coordinators**: Roster of active organizers with immediate privilege revocation returning users to `ROLE_USER`.
+- **`/admin/events/new` & `/admin/events/:id/edit`**: Full administrative event management.
+
+---
+
+## Test Verification Summary
+
+### Backend Tests (JUnit 5, Mockito, Spring Boot Test)
+```bash
+cd backend
+.\mvnw.cmd test
+```
+- **Total Tests Run**: 166
+- **Passed**: 163
+- **Failures**: 0
+- **Errors**: 0
+- **Skipped**: 3 (conditionally skipped when remote cloud PostgreSQL database is offline)
+- **Status**: `BUILD SUCCESS`
+
+### Frontend Tests (Vitest, React Testing Library, jsdom)
+```bash
+cd frontend
+npm.cmd test
+```
+- **Test Files**: 10 passed (10)
+- **Total Tests Run**: 61 passed (61)
+- **Failures**: 0
+- **Status**: `PASS`
+
+### Frontend Production Build (Vite)
+```bash
+cd frontend
+npm.cmd run build
+```
+- **Status**: `Built in ~200ms` (0 errors, 49 modules transformed into production assets).
+
+---
+
+## Known Limitations & Production Notes
+
+1. **Free Tier Cold Starts**: Render and other free-tier PaaS instances sleep after inactivity. First requests after idle take ~45–60 seconds.
+2. **JWT Storage**: Bearer tokens are stored in `localStorage` for stateless SPA operation. Enterprise deployments should migrate to `HttpOnly`, `SameSite=Strict` cookies.
+3. **Banner Uploads**: Posters use external HTTPS URLs. Future releases can incorporate AWS S3 / Cloudflare R2 direct uploads.
 
 
