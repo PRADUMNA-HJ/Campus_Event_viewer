@@ -74,7 +74,7 @@ export default function AdminEventFormPage() {
       setIsLoadingEvent(true);
       setGeneralError('');
       try {
-        const { event } = await fetchEventById(id);
+        const { event } = await fetchEventById(id, token);
         if (!event) {
           if (isMounted) {
             setGeneralError(`Event with ID ${id} was not found.`);

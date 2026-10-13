@@ -185,10 +185,10 @@ export async function fetchEvents() {
  * Fetches a single event by ID (Public).
  * Falls back to mock data if the API is unavailable.
  */
-export async function fetchEventById(id) {
+export async function fetchEventById(id, token = null) {
   try {
     const response = await fetch(`${API_BASE_URL}/events/${id}`, {
-      headers: { 'Accept': 'application/json' },
+      headers: authHeaders(token),
     });
     if (!response.ok) {
       if (response.status === 404) {
