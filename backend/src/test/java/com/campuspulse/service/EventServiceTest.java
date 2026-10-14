@@ -243,6 +243,69 @@ class EventServiceTest {
     }
 
     @Test
+    @DisplayName("getTodayEvents: Should return published events active today including ongoing, upcoming, completed, and multi-day")
+    void testGetTodayEvents_IncludesAllTodayOverlappingEvents() {
+        java.time.LocalDate today = java.time.LocalDate.of(2026, 10, 14);
+
+        // 1. Ongoing event: started earlier today, ends later today
+        Event ongoing = createSampleEntity(1L);
+        ongoing.setTitle("Ongoing Hackathon");
+        ongoing.setStartDateTime(today.atTime(9, 0));
+        ongoing.setEndDateTime(today.atTime(17, 0));
+
+        // 2. Upcoming event today: starts this evening
+        Event upcoming = createSampleEntity(2L);
+        upcoming.setTitle("Evening Seminar");
+        upcoming.setStartDateTime(today.atTime(18, 0));
+        upcoming.setEndDateTime(today.atTime(20, 0));
+
+        // 3. Completed event today: ended this morning
+        Event completed = createSampleEntity(3L);
+        completed.setTitle("Morning Keynote");
+        completed.setStartDateTime(today.atTime(7, 0));
+        completed.setEndDateTime(today.atTime(8, 30));
+
+        // 4. Multi-day event spanning across today
+        Event multiDay = createSampleEntity(4L);
+        multiDay.setTitle("3-Day Conference");
+        multiDay.setStartDateTime(today.minusDays(1).atTime(10, 0));
+        multiDay.setEndDateTime(today.plusDays(1).atTime(18, 0));
+
+        // 5. Midnight-crossing event: starts tonight, ends tomorrow at 2 AM
+        Event midnightCross = createSampleEntity(5L);
+        midnightCross.setTitle("Midnight Hack Session");
+        midnightCross.setStartDateTime(today.atTime(22, 0));
+        midnightCross.setEndDateTime(today.plusDays(1).atTime(2, 0));
+
+        // 6. Out-of-day past event: ended yesterday
+        Event past = createSampleEntity(6L);
+        past.setTitle("Yesterday Workshop");
+        past.setStartDateTime(today.minusDays(1).atTime(10, 0));
+        past.setEndDateTime(today.minusDays(1).atTime(16, 0));
+
+        // 7. Out-of-day future event: starts tomorrow
+        Event future = createSampleEntity(7L);
+        future.setTitle("Tomorrow Meetup");
+        future.setStartDateTime(today.plusDays(1).atTime(10, 0));
+        future.setEndDateTime(today.plusDays(1).atTime(12, 0));
+
+        when(eventRepository.findByStatusOrderByStartDateTimeAsc(EventStatus.PUBLISHED))
+                .thenReturn(List.of(multiDay, completed, ongoing, upcoming, midnightCross, past, future));
+
+        List<EventResponse> results = eventService.getTodayEvents(today);
+
+        assertThat(results).hasSize(5);
+        assertThat(results).extracting(EventResponse::getTitle)
+                .containsExactly(
+                        "3-Day Conference",
+                        "Morning Keynote",
+                        "Ongoing Hackathon",
+                        "Evening Seminar",
+                        "Midnight Hack Session"
+                );
+    }
+
+    @Test
     @DisplayName("createEvent: Should throw InvalidEventException when startDateTime or endDateTime is null")
     void testCreateEvent_NullStartOrEndDate_ThrowsException() {
         EventCreateRequest nullStart = createSampleRequest();

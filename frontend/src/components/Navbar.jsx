@@ -134,6 +134,13 @@ export default function Navbar() {
                 Events
               </Link>
               <Link
+                to="/today"
+                className={`navbar__link ${isActive('/today') ? 'navbar__link--active' : ''}`}
+                id="nav-link-today"
+              >
+                Happening Today
+              </Link>
+              <Link
                 to="/about"
                 className={`navbar__link ${isActive('/about') ? 'navbar__link--active' : ''}`}
                 id="nav-link-about"
@@ -289,12 +296,21 @@ export default function Navbar() {
         <Link
           to="/"
           className={`navbar__mobile-link ${isActive('/') && !location.pathname.startsWith('/admin') && !location.pathname.startsWith('/coordinator') ? 'navbar__mobile-link--active' : ''}`}
+          id="nav-mobile-link-events"
         >
           Events
         </Link>
         <Link
+          to="/today"
+          className={`navbar__mobile-link ${isActive('/today') ? 'navbar__mobile-link--active' : ''}`}
+          id="nav-mobile-link-today"
+        >
+          Happening Today
+        </Link>
+        <Link
           to="/about"
           className={`navbar__mobile-link ${isActive('/about') ? 'navbar__mobile-link--active' : ''}`}
+          id="nav-mobile-link-about"
         >
           About
         </Link>

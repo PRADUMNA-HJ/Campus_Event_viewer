@@ -19,6 +19,15 @@ public interface EventService {
     List<EventResponse> getUpcomingEvents();
 
     /**
+     * Retrieves all published events scheduled for or active during the current calendar day.
+     * Includes events starting today, ending today, ongoing events that started earlier,
+     * and multi-day events crossing today.
+     *
+     * @return chronologically sorted list of today's event responses
+     */
+    List<EventResponse> getTodayEvents();
+
+    /**
      * Retrieves a single event by its unique ID.
      *
      * @param id the event ID

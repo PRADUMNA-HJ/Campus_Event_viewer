@@ -182,6 +182,28 @@ export async function fetchEvents() {
 }
 
 /**
+ * Fetches all published events scheduled for or active today (Public).
+ * Strictly communicates with live backend data and never displays mock events.
+ */
+export async function fetchTodayEvents() {
+  try {
+    const response = await fetch(`${API_BASE_URL}/events/today`, {
+      headers: { 'Accept': 'application/json' },
+    });
+    if (!response.ok) {
+      await handleResponseError(response);
+    }
+    const events = await response.json();
+    return { events, isMock: false };
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    throw new ApiError('Unable to connect to events service. Please verify the backend is running.', 0);
+  }
+}
+
+/**
  * Fetches a single event by ID (Public).
  * Falls back to mock data if the API is unavailable.
  */

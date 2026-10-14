@@ -6,6 +6,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 
 // Public Discovery Pages
 import HomePage from './pages/HomePage';
+import HappeningTodayPage from './pages/HappeningTodayPage';
 import EventDetailPage from './pages/EventDetailPage';
 import AboutPage from './pages/AboutPage';
 import NotFoundPage from './pages/NotFoundPage';
@@ -43,6 +44,7 @@ export default function App() {
             <Routes>
               {/* Public Discovery Routes */}
               <Route path="/" element={<HomePage />} />
+              <Route path="/today" element={<HappeningTodayPage />} />
               <Route path="/events/:id" element={<EventDetailPage />} />
               <Route path="/about" element={<AboutPage />} />
 

@@ -17,6 +17,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -55,6 +56,30 @@ public class EventServiceImpl implements EventService {
         return eventRepository.findByStartDateTimeAfterOrderByStartDateTimeAsc(now)
                 .stream()
                 .filter(event -> event.getStatus() == EventStatus.PUBLISHED)
+                .map(EventResponse::fromEntity)
+                .toList();
+    }
+
+    @Override
+    public List<EventResponse> getTodayEvents() {
+        return getTodayEvents(LocalDate.now());
+    }
+
+    /**
+     * Retrieves published events that are active on the specified calendar date.
+     * Package-private to facilitate deterministic date testing.
+     */
+    public List<EventResponse> getTodayEvents(LocalDate date) {
+        if (date == null) {
+            date = LocalDate.now();
+        }
+        LocalDateTime startOfDay = date.atStartOfDay();
+        LocalDateTime endOfDay = date.atTime(23, 59, 59, 999999999);
+
+        return eventRepository.findByStatusOrderByStartDateTimeAsc(EventStatus.PUBLISHED)
+                .stream()
+                .filter(event -> event.getStartDateTime() != null && event.getEndDateTime() != null)
+                .filter(event -> !event.getStartDateTime().isAfter(endOfDay) && !event.getEndDateTime().isBefore(startOfDay))
                 .map(EventResponse::fromEntity)
                 .toList();
     }

@@ -44,6 +44,16 @@ public class EventController {
     }
 
     /**
+     * GET /api/events/today - List all published events scheduled for or active today.
+     * Publicly accessible.
+     */
+    @GetMapping("/today")
+    public ResponseEntity<List<EventResponse>> getTodayEvents() {
+        List<EventResponse> events = eventService.getTodayEvents();
+        return ResponseEntity.ok(events);
+    }
+
+    /**
      * GET /api/events/{id} - Get details of a single event by ID.
      * Non-published events are accessible only to their creator or Main Admin.
      */

@@ -6,6 +6,7 @@ import {
   updateEvent,
   deleteEvent,
   fetchEvents,
+  fetchTodayEvents,
   fetchEventById,
   ApiError,
 } from '../services/api';
@@ -240,6 +241,26 @@ describe('CampusPulse API Service', () => {
       const { event, isMock } = await fetchEventById(999);
       expect(event).toBeNull();
       expect(isMock).toBe(false);
+    });
+
+    it('fetchTodayEvents retrieves events from /events/today without falling back to mock data', async () => {
+      const mockList = [{ id: 10, title: 'Hackathon Today' }];
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => mockList,
+      });
+
+      const { events, isMock } = await fetchTodayEvents();
+      expect(events).toEqual(mockList);
+      expect(isMock).toBe(false);
+      const [url] = global.fetch.mock.calls[0];
+      expect(url).toContain('/events/today');
+    });
+
+    it('fetchTodayEvents throws ApiError on failure and NEVER falls back to mock data', async () => {
+      global.fetch = vi.fn().mockRejectedValue(new Error('Connection refused'));
+
+      await expect(fetchTodayEvents()).rejects.toThrow(ApiError);
     });
   });
 });

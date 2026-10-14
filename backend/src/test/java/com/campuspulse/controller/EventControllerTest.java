@@ -113,6 +113,23 @@ class EventControllerTest {
     }
 
     @Test
+    @DisplayName("GET /api/events/today: Should return 200 OK and list of today's events")
+    void testGetTodayEvents_Success() throws Exception {
+        when(eventService.getTodayEvents()).thenReturn(List.of(
+                createSampleResponse(1L),
+                createSampleResponse(2L)
+        ));
+
+        mockMvc.perform(get("/api/events/today")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(2)))
+                .andExpect(jsonPath("$[0].id", is(1)))
+                .andExpect(jsonPath("$[0].title", is("HackPulse 2026")))
+                .andExpect(jsonPath("$[0].eventType", is("HACKATHON")));
+    }
+
+    @Test
     @DisplayName("GET /api/events/{id}: Should return 200 OK when event exists")
     void testGetEventById_Success() throws Exception {
         when(eventService.getEventById(1L)).thenReturn(createSampleResponse(1L));

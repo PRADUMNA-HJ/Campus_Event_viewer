@@ -181,3 +181,113 @@ export function toIsoDateTime(localValue) {
   }
   return localValue;
 }
+
+/**
+ * Safely parses an ISO date string or Date object into a valid Date instance.
+ * Returns null if the value is missing, invalid, or unparseable.
+ * @param {string|Date} dateVal
+ * @returns {Date|null}
+ */
+export function parseSafeDate(dateVal) {
+  if (!dateVal) return null;
+  const date = dateVal instanceof Date ? dateVal : new Date(dateVal);
+  return isNaN(date.getTime()) ? null : date;
+}
+
+/**
+ * Checks whether two dates represent the same calendar day in local time.
+ * @param {Date|string} d1
+ * @param {Date|string} d2
+ * @returns {boolean}
+ */
+export function isSameDay(d1, d2) {
+  const date1 = parseSafeDate(d1);
+  const date2 = parseSafeDate(d2);
+  if (!date1 || !date2) return false;
+  return (
+    date1.getFullYear() === date2.getFullYear() &&
+    date1.getMonth() === date2.getMonth() &&
+    date1.getDate() === date2.getDate()
+  );
+}
+
+/**
+ * Formats a Date object to a human-readable day header.
+ * e.g. "Wednesday, October 14, 2026"
+ * @param {Date|string} dateVal
+ * @returns {string}
+ */
+export function formatFullDate(dateVal) {
+  const date = parseSafeDate(dateVal) || new Date();
+  return date.toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
+
+/**
+ * Checks whether an event's active duration overlaps a given calendar day.
+ * Handles single-day, multi-day, and midnight-crossing events.
+ * @param {Date|string} startVal
+ * @param {Date|string} endVal
+ * @param {Date|string} referenceDateVal
+ * @returns {boolean}
+ */
+export function isEventActiveOnDay(startVal, endVal, referenceDateVal = new Date()) {
+  const start = parseSafeDate(startVal);
+  const end = parseSafeDate(endVal);
+  const ref = parseSafeDate(referenceDateVal) || new Date();
+
+  if (!start && !end) return false;
+
+  const effectiveStart = start || end;
+  const effectiveEnd = end || start;
+
+  const startOfDay = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate(), 0, 0, 0, 0);
+  const endOfDay = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate(), 23, 59, 59, 999);
+
+  return effectiveStart <= endOfDay && effectiveEnd >= startOfDay;
+}
+
+/**
+ * Classifies an event relative to a specific time (now).
+ * Returns 'ONGOING', 'UPCOMING', 'COMPLETED', or 'OUT_OF_RANGE'.
+ * Never classifies as ongoing before start or after end.
+ * @param {string|Date} startVal
+ * @param {string|Date} endVal
+ * @param {Date} now
+ * @returns {'ONGOING'|'UPCOMING'|'COMPLETED'|'OUT_OF_RANGE'|'INVALID'}
+ */
+export function classifyEventTiming(startVal, endVal, now = new Date()) {
+  const start = parseSafeDate(startVal);
+  const end = parseSafeDate(endVal);
+
+  if (!start && !end) return 'INVALID';
+
+  const effectiveStart = start || end;
+  const effectiveEnd = end || start;
+
+  if (!isEventActiveOnDay(effectiveStart, effectiveEnd, now)) {
+    return 'OUT_OF_RANGE';
+  }
+
+  // Strictly between start and end (ongoing right now)
+  if (effectiveStart <= now && now < effectiveEnd) {
+    return 'ONGOING';
+  }
+
+  // Has not started yet
+  if (now < effectiveStart) {
+    return 'UPCOMING';
+  }
+
+  // Has concluded
+  if (effectiveEnd <= now) {
+    return 'COMPLETED';
+  }
+
+  return 'OUT_OF_RANGE';
+}
+

@@ -642,6 +642,7 @@ Run against local, staging, or production backend:
 | 10 | **Data Persistence** | Restarting the backend service does not lose created events; records remain stored in PostgreSQL. |
 | 11 | **CORS Enforcement** | Preflight `OPTIONS /api/events` from configured frontend domain returns `Access-Control-Allow-Origin`. Unauthorized origins are denied. |
 | 12 | **Safe Error Handling** | Invalid inputs return structured HTTP 400 `ErrorResponse` without exposing stack traces, database schemas, or secrets. |
+| 13 | **Happening Today API & Page** | `GET /api/events/today` returns published events active today; `/today` renders Ongoing, Upcoming, and Completed sections with live 30s recalculation. |
 
 ---
 
@@ -650,7 +651,8 @@ Run against local, staging, or production backend:
 CampusPulse provides three integrated user experiences across desktop, tablet, and mobile:
 
 ### 1. Public Visitor Experience (No Login Required)
-- **`/` (Home)**: Real-time discovery feed of published, upcoming campus events and hackathons with search, category filters, and empty/error states.
+- **`/` (Home / Events)**: Real-time discovery feed of published, upcoming campus events and hackathons with search, category filters, and empty/error states.
+- **`/today` (Happening Today)**: Dedicated public real-time hub categorizing the current calendar day's schedule into **"Ongoing Now"** (with live indicator), **"Upcoming Today"** (sorted chronologically by start time), and **"Completed Today"**. Automatically recalculates classifications every 30 seconds without full page reloads, seamlessly handles events crossing midnight and multi-day spans, and communicates strictly with live backend data (no mock-data fallback).
 - **`/events/:id` (Event Details)**: Complete schedule, venue, attendee limits, organizer contacts, and direct registration links opened safely (`target="_blank" rel="noopener noreferrer"`).
 - **`/about`**: CampusPulse mission, community guidelines, and platform overview.
 
@@ -666,11 +668,29 @@ CampusPulse provides three integrated user experiences across desktop, tablet, a
 - **`/coordinator/events/:id/edit`**: Event editing. Significant updates to published events automatically reset status to `PENDING_REVIEW`.
 
 ### 4. Main Admin Experience (`ROLE_MAIN_ADMIN`)
-- **`/admin/dashboard`**: Unified control center with three operational tabs:
+- **`/admin/dashboard`**: Unified control hub featuring an improved administrator layout, dedicated top navigation with public-site toggle, and three operational management tabs:
   - **Tab 1: All Events & Moderation**: Real-time moderation table. One-click publishing, rejection with optional review feedback note, edit any event, delete any event.
   - **Tab 2: Coordinator Requests**: Review queue for student organizer applications. One-click approval promoting user to `ROLE_COORDINATOR`, or rejection with review note.
   - **Tab 3: Active Coordinators**: Roster of active organizers with immediate privilege revocation returning users to `ROLE_USER`.
 - **`/admin/events/new` & `/admin/events/:id/edit`**: Full administrative event management.
+
+---
+
+## Release Notes
+
+### v1.1.0 — Happening Today & Admin Dashboard Enhancements
+- **Public Happening Today Hub (`/today`)**:
+  - Added dedicated public route and navigation item for current day discovery.
+  - Three distinct sections: "Ongoing Now" (with live pulsating badge), "Upcoming Today" (sorted by start time), and "Completed Today".
+  - Live status transitions every 30 seconds without requiring page reloads.
+  - Correct midnight-crossing and multi-day event boundary handling.
+  - Safe error and loading states with retry mechanism; zero mock data fallback.
+- **Backend `GET /api/events/today` Endpoint**:
+  - Exposes public read-only endpoint returning published events active on the current calendar day.
+  - Zero database schema changes; fully backward-compatible with existing endpoints.
+- **Admin Dashboard UI Improvements**:
+  - Upgraded top navigation with dedicated admin control bar, quick-link to public site, user badge, and mobile drawer support.
+  - Streamlined operational tabs and action buttons for event moderation and coordinator workflows.
 
 ---
 
@@ -681,8 +701,8 @@ CampusPulse provides three integrated user experiences across desktop, tablet, a
 cd backend
 .\mvnw.cmd test
 ```
-- **Total Tests Run**: 166
-- **Passed**: 163
+- **Total Tests Run**: 168
+- **Passed**: 165
 - **Failures**: 0
 - **Errors**: 0
 - **Skipped**: 3 (conditionally skipped when remote cloud PostgreSQL database is offline)
@@ -693,8 +713,8 @@ cd backend
 cd frontend
 npm.cmd test
 ```
-- **Test Files**: 10 passed (10)
-- **Total Tests Run**: 61 passed (61)
+- **Test Files**: 11 passed (11)
+- **Total Tests Run**: 71 passed (71)
 - **Failures**: 0
 - **Status**: `PASS`
 
@@ -703,7 +723,7 @@ npm.cmd test
 cd frontend
 npm.cmd run build
 ```
-- **Status**: `Built in ~200ms` (0 errors, 49 modules transformed into production assets).
+- **Status**: `Built in ~200ms` (0 errors, 50 modules transformed into production assets).
 
 ---
 
@@ -712,5 +732,6 @@ npm.cmd run build
 1. **Free Tier Cold Starts**: Render and other free-tier PaaS instances sleep after inactivity. First requests after idle take ~45–60 seconds.
 2. **JWT Storage**: Bearer tokens are stored in `localStorage` for stateless SPA operation. Enterprise deployments should migrate to `HttpOnly`, `SameSite=Strict` cookies.
 3. **Banner Uploads**: Posters use external HTTPS URLs. Future releases can incorporate AWS S3 / Cloudflare R2 direct uploads.
+
 
 

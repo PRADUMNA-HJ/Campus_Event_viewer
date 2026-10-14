@@ -25,6 +25,7 @@ describe('Navbar Component', () => {
     renderNavbar('/');
 
     expect(document.getElementById('nav-link-events')).toBeInTheDocument();
+    expect(document.getElementById('nav-link-today')).toBeInTheDocument();
     expect(document.getElementById('nav-link-about')).toBeInTheDocument();
     expect(document.getElementById('nav-link-admin-login')).toBeInTheDocument();
     expect(document.getElementById('nav-link-dashboard')).not.toBeInTheDocument();
