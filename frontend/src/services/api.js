@@ -193,7 +193,25 @@ export async function fetchTodayEvents() {
     if (!response.ok) {
       await handleResponseError(response);
     }
-    const events = await response.json();
+    if (response.status === 204) {
+      return { events: [], isMock: false };
+    }
+    const data = await response.json();
+    let events = null;
+    if (Array.isArray(data)) {
+      events = data;
+    } else if (data && typeof data === 'object') {
+      if (Array.isArray(data.events)) {
+        events = data.events;
+      } else if (Array.isArray(data.data)) {
+        events = data.data;
+      }
+    }
+
+    if (!events) {
+      throw new ApiError('Unexpected response payload format from events service.', response.status || 500);
+    }
+
     return { events, isMock: false };
   } catch (error) {
     if (error instanceof ApiError) {

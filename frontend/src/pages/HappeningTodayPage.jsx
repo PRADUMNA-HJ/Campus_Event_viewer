@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import EventCard from '../components/EventCard';
 import SkeletonCards from '../components/SkeletonCards';
@@ -24,21 +24,41 @@ export default function HappeningTodayPage() {
   const [error, setError] = useState(null);
   const [currentTime, setCurrentTime] = useState(() => new Date());
 
+  // Tracks active request to discard stale responses and prevent out-of-order race conditions
+  const activeRequestIdRef = useRef(0);
+
   const loadTodayEvents = useCallback(async () => {
+    const requestId = ++activeRequestIdRef.current;
     setLoading(true);
     setError(null);
     try {
       const result = await fetchTodayEvents();
-      setEvents(result.events || []);
+      // If a newer request was triggered or component unmounted, discard this stale result
+      if (requestId !== activeRequestIdRef.current) {
+        return;
+      }
+      const rawEvents = Array.isArray(result)
+        ? result
+        : (Array.isArray(result?.events) ? result.events : (Array.isArray(result?.data) ? result.data : []));
+      setEvents(rawEvents);
     } catch (err) {
+      if (requestId !== activeRequestIdRef.current) {
+        return;
+      }
       setError(err?.message || 'Failed to load today’s events. Please try again.');
     } finally {
-      setLoading(false);
+      if (requestId === activeRequestIdRef.current) {
+        setLoading(false);
+      }
     }
   }, []);
 
   useEffect(() => {
     loadTodayEvents();
+    return () => {
+      // Invalidate any in-flight requests on unmount
+      activeRequestIdRef.current++;
+    };
   }, [loadTodayEvents]);
 
   // Recalculate event classifications every 30 seconds
@@ -55,8 +75,10 @@ export default function HappeningTodayPage() {
     const upcoming = [];
     const completed = [];
 
+    const safeEvents = Array.isArray(events) ? events : [];
+
     // Filter only published events that have valid dates
-    for (const event of events) {
+    for (const event of safeEvents) {
       if (event.status && event.status !== 'PUBLISHED') {
         continue;
       }

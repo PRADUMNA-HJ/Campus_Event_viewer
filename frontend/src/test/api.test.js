@@ -262,5 +262,64 @@ describe('CampusPulse API Service', () => {
 
       await expect(fetchTodayEvents()).rejects.toThrow(ApiError);
     });
+
+    it('fetchTodayEvents handles empty array response [] correctly', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => [],
+      });
+
+      const { events, isMock } = await fetchTodayEvents();
+      expect(events).toEqual([]);
+      expect(isMock).toBe(false);
+    });
+
+    it('fetchTodayEvents handles 204 No Content response gracefully', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 204,
+      });
+
+      const { events, isMock } = await fetchTodayEvents();
+      expect(events).toEqual([]);
+      expect(isMock).toBe(false);
+    });
+
+    it('fetchTodayEvents safely parses wrapped response { events: [...] }', async () => {
+      const mockList = [{ id: 10, title: 'Hackathon Today' }];
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ events: mockList }),
+      });
+
+      const { events, isMock } = await fetchTodayEvents();
+      expect(events).toEqual(mockList);
+      expect(isMock).toBe(false);
+    });
+
+    it('fetchTodayEvents safely parses wrapped response { data: [...] }', async () => {
+      const mockList = [{ id: 11, title: 'AI Summit Today' }];
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ data: mockList }),
+      });
+
+      const { events, isMock } = await fetchTodayEvents();
+      expect(events).toEqual(mockList);
+      expect(isMock).toBe(false);
+    });
+
+    it('fetchTodayEvents throws ApiError on unexpected payload shapes', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ unexpectedField: 12345 }),
+      });
+
+      await expect(fetchTodayEvents()).rejects.toThrow(ApiError);
+    });
   });
 });
