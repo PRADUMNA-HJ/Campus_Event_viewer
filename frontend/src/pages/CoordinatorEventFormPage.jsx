@@ -48,16 +48,18 @@ export default function CoordinatorEventFormPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [initialStatus, setInitialStatus] = useState(null);
 
-  // Load existing event data in edit mode
+  // Load existing event data in edit mode.
+  // Passes the auth token so the backend can serve non-published events
+  // (PENDING_REVIEW, REJECTED) that are only visible to their owner coordinator.
   useEffect(() => {
     if (!isEditMode) return;
 
     async function loadEvent() {
       setIsLoading(true);
       try {
-        const { event } = await fetchEventById(id);
+        const { event } = await fetchEventById(id, token);
         if (!event) {
-          setGeneralError('Event not found or inaccessible.');
+          setGeneralError('Event not found or you do not have permission to edit it.');
           return;
         }
 
@@ -78,14 +80,18 @@ export default function CoordinatorEventFormPage() {
           registrationUrl: event.registrationUrl || '',
         });
       } catch (err) {
-        setGeneralError('Failed to load event for editing: ' + err.message);
+        if (err instanceof ApiError && err.status === 403) {
+          setGeneralError('Access denied: You can only edit events you created.');
+        } else {
+          setGeneralError('Failed to load event for editing: ' + err.message);
+        }
       } finally {
         setIsLoading(false);
       }
     }
 
     loadEvent();
-  }, [id, isEditMode]);
+  }, [id, isEditMode, token]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;

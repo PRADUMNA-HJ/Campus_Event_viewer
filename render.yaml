@@ -35,13 +35,29 @@ services:
         generateValue: true
       - key: JWT_EXPIRATION_MS
         value: 86400000
-      # Configure with your actual Vercel domain once frontend is deployed (comma-separated, no trailing slash)
+      # Comma-separated list of allowed CORS origins (no trailing slashes).
+      # Includes the production Vercel frontend domain and localhost for local development.
       - key: CORS_ALLOWED_ORIGINS
-        value: https://campuspulse.vercel.app,http://localhost:5173
+        value: https://campus-event-viewer.vercel.app,http://localhost:5173
+      # Legacy bootstrap env var name (kept for backwards compatibility with application.properties chain)
+      # The primary preferred name is CAMPUSPULSE_ADMIN_EMAIL (see below).
       - key: ADMIN_BOOTSTRAP_EMAIL
         value: admin@campuspulse.edu
-      - key: ADMIN_BOOTSTRAP_PASSWORD
-        generateValue: true
+      # Primary admin bootstrap email (preferred var name read by AdminBootstrapRunner via
+      # application.properties: app.admin.bootstrap.email=${CAMPUSPULSE_ADMIN_EMAIL:${ADMIN_BOOTSTRAP_EMAIL:}})
+      - key: CAMPUSPULSE_ADMIN_EMAIL
+        value: admin@campuspulse.edu
+      # IMPORTANT: ADMIN_BOOTSTRAP_PASSWORD and CAMPUSPULSE_ADMIN_PASSWORD must be set as
+      # a MANUAL SECRET in the Render dashboard (Environment > Secret Files / Environment Variables).
+      # Do NOT use generateValue: true here — a generated password cannot be retrieved and makes
+      # the admin account permanently inaccessible after the first deploy.
+      # Steps:
+      #   1. Open Render dashboard > campuspulse-backend > Environment
+      #   2. Add secret variable: CAMPUSPULSE_ADMIN_PASSWORD = <your-chosen-strong-password>
+      #   3. Also add:           ADMIN_BOOTSTRAP_PASSWORD  = <same-value> (legacy alias)
+      #   4. Save and redeploy.
+      # AdminBootstrapRunner is idempotent: it only creates the admin ONCE (single-admin policy).
+      # After the first successful deploy, you may remove these vars from the dashboard if desired.
 
 # NOTE: The React frontend is deployed to Vercel (target hosting architecture).
 # The redundant Render static frontend service has been removed to avoid duplicate hosting and billing.
