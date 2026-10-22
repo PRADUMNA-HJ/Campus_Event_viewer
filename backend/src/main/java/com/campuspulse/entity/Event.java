@@ -94,6 +94,18 @@ public class Event {
     @Column(name = "banner_url", length = 500)
     private String bannerUrl;
 
+    @Size(max = 255, message = "Banner public ID must not exceed 255 characters")
+    @Column(name = "banner_public_id", length = 255)
+    private String bannerPublicId;
+
+    @Size(max = 500, message = "QR code URL must not exceed 500 characters")
+    @Column(name = "qr_code_url", length = 500)
+    private String qrCodeUrl;
+
+    @Size(max = 255, message = "QR code public ID must not exceed 255 characters")
+    @Column(name = "qr_code_public_id", length = 255)
+    private String qrCodePublicId;
+
     @Size(max = 500, message = "Registration URL must not exceed 500 characters")
     @Column(name = "registration_url", length = 500)
     private String registrationUrl;
@@ -279,6 +291,30 @@ public class Event {
 
     public void setBannerUrl(String bannerUrl) {
         this.bannerUrl = bannerUrl;
+    }
+
+    public String getBannerPublicId() {
+        return bannerPublicId;
+    }
+
+    public void setBannerPublicId(String bannerPublicId) {
+        this.bannerPublicId = bannerPublicId;
+    }
+
+    public String getQrCodeUrl() {
+        return qrCodeUrl;
+    }
+
+    public void setQrCodeUrl(String qrCodeUrl) {
+        this.qrCodeUrl = qrCodeUrl;
+    }
+
+    public String getQrCodePublicId() {
+        return qrCodePublicId;
+    }
+
+    public void setQrCodePublicId(String qrCodePublicId) {
+        this.qrCodePublicId = qrCodePublicId;
     }
 
     public String getRegistrationUrl() {

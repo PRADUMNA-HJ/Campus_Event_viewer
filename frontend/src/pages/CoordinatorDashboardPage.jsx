@@ -369,12 +369,52 @@ export default function CoordinatorDashboardPage() {
                     <tr key={event.id} id={`coordinator-event-row-${event.id}`}>
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-                          <span style={{ fontSize: '1.25rem' }}>{getEventTypeEmoji(event.eventType)}</span>
+                          {event.bannerUrl ? (
+                            <img
+                              src={event.bannerUrl}
+                              alt=""
+                              style={{
+                                width: '38px',
+                                height: '38px',
+                                borderRadius: 'var(--radius-sm)',
+                                objectFit: 'cover',
+                                border: '1px solid var(--border-card)',
+                                flexShrink: 0,
+                              }}
+                              onError={(e) => {
+                                e.target.style.display = 'none';
+                                if (e.target.nextSibling) e.target.nextSibling.style.display = 'inline-block';
+                              }}
+                            />
+                          ) : null}
+                          <span style={{ fontSize: '1.25rem', display: event.bannerUrl ? 'none' : 'inline-block' }}>
+                            {getEventTypeEmoji(event.eventType)}
+                          </span>
                           <div>
                             <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{event.title}</div>
-                            <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>
-                              {event.eventType}
-                            </span>
+                            <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', marginTop: '2px' }}>
+                              <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>
+                                {event.eventType}
+                              </span>
+                              {event.bannerUrl && (
+                                <span
+                                  className="badge"
+                                  title={`Banner URL: ${event.bannerUrl}`}
+                                  style={{ fontSize: '10px', padding: '1px 5px', background: 'var(--bg-secondary)', color: 'var(--text-secondary)' }}
+                                >
+                                  Banner
+                                </span>
+                              )}
+                              {event.qrCodeUrl && (
+                                <span
+                                  className="badge"
+                                  title={`QR Code URL: ${event.qrCodeUrl}`}
+                                  style={{ fontSize: '10px', padding: '1px 5px', background: 'rgba(168, 85, 247, 0.15)', color: 'var(--accent-purple)' }}
+                                >
+                                  QR
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </td>

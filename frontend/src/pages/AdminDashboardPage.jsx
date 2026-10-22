@@ -420,12 +420,52 @@ export default function AdminDashboardPage() {
                   <tr key={event.id} id={`admin-event-row-${event.id}`}>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-                        <span style={{ fontSize: '1.25rem' }}>{getEventTypeEmoji(event.eventType)}</span>
+                        {event.bannerUrl ? (
+                          <img
+                            src={event.bannerUrl}
+                            alt=""
+                            style={{
+                              width: '38px',
+                              height: '38px',
+                              borderRadius: 'var(--radius-sm)',
+                              objectFit: 'cover',
+                              border: '1px solid var(--border-card)',
+                              flexShrink: 0,
+                            }}
+                            onError={(e) => {
+                              e.target.style.display = 'none';
+                              if (e.target.nextSibling) e.target.nextSibling.style.display = 'inline-block';
+                            }}
+                          />
+                        ) : null}
+                        <span style={{ fontSize: '1.25rem', display: event.bannerUrl ? 'none' : 'inline-block' }}>
+                          {getEventTypeEmoji(event.eventType)}
+                        </span>
                         <div>
                           <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{event.title}</div>
-                          <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>
-                            {event.eventType}
-                          </span>
+                          <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', marginTop: '2px' }}>
+                            <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-muted)' }}>
+                              {event.eventType}
+                            </span>
+                            {event.bannerUrl && (
+                              <span
+                                className="badge"
+                                title={`Banner URL: ${event.bannerUrl}`}
+                                style={{ fontSize: '10px', padding: '1px 5px', background: 'var(--bg-secondary)', color: 'var(--text-secondary)' }}
+                              >
+                                Banner
+                              </span>
+                            )}
+                            {event.qrCodeUrl && (
+                              <span
+                                className="badge"
+                                title={`QR Code URL: ${event.qrCodeUrl}`}
+                                style={{ fontSize: '10px', padding: '1px 5px', background: 'rgba(6, 182, 212, 0.15)', color: 'var(--accent-cyan)' }}
+                              >
+                                QR
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </td>
@@ -1089,6 +1129,35 @@ export default function AdminDashboardPage() {
             <p style={{ color: 'var(--text-secondary)', marginBottom: 'var(--space-4)', fontSize: 'var(--font-size-sm)' }}>
               Rejecting "{eventToReject.title}" will remove it from consideration. You can provide feedback for the coordinator.
             </p>
+            {/* Asset Previews in Reject Modal */}
+            {(eventToReject.bannerUrl || eventToReject.qrCodeUrl) && (
+              <div style={{ display: 'flex', gap: 'var(--space-3)', marginBottom: 'var(--space-4)', padding: 'var(--space-3)', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-card)' }}>
+                {eventToReject.bannerUrl && (
+                  <div style={{ flex: 1 }}>
+                    <span style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'block', marginBottom: 'var(--space-1)' }}>Banner Asset</span>
+                    <img
+                      src={eventToReject.bannerUrl}
+                      alt="Banner Preview"
+                      style={{ maxHeight: '70px', width: '100%', objectFit: 'cover', borderRadius: 'var(--radius-sm)' }}
+                      onError={(e) => { e.target.style.display = 'none'; }}
+                    />
+                  </div>
+                )}
+                {eventToReject.qrCodeUrl && (
+                  <div style={{ width: '70px', textAlign: 'center' }}>
+                    <span style={{ fontSize: '10px', color: 'var(--text-muted)', display: 'block', marginBottom: 'var(--space-1)' }}>QR Code</span>
+                    <div style={{ background: '#fff', padding: '3px', borderRadius: 'var(--radius-sm)', display: 'inline-block' }}>
+                      <img
+                        src={eventToReject.qrCodeUrl}
+                        alt="QR Code Preview"
+                        style={{ width: '56px', height: '56px', objectFit: 'contain', display: 'block' }}
+                        onError={(e) => { e.target.style.display = 'none'; }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
             <div className="form-group">
               <label htmlFor="reject-note" className="form-label">Review Note (Optional)</label>
               <textarea

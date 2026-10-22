@@ -262,4 +262,45 @@ describe('AdminEventFormPage Component', () => {
       await screen.findByText('Unable to connect to the server. Please check that the backend is running.')
     ).toBeInTheDocument();
   });
+
+  it('renders banner and QR file pickers, validates 5MB limit, and packages FormData on submit', async () => {
+    const user = userEvent.setup();
+    global.URL.createObjectURL = vi.fn(() => 'mock-admin-blob-url');
+
+    vi.spyOn(api, 'createEvent').mockResolvedValue({ id: 88, title: 'Admin Event with Assets' });
+    renderCreateForm();
+
+    const bannerInput = screen.getByLabelText(/Upload Banner File/i);
+    const qrInput = screen.getByLabelText(/Upload QR-Code File/i);
+    expect(bannerInput).toBeInTheDocument();
+    expect(qrInput).toBeInTheDocument();
+
+    // Check size validation
+    const oversizedFile = new File([new Uint8Array(6 * 1024 * 1024)], 'big.jpg', { type: 'image/jpeg' });
+    await user.upload(bannerInput, oversizedFile);
+    expect(screen.getByText(/Banner image size must not exceed 5 MB/i)).toBeInTheDocument();
+
+    // Fill required form fields
+    await user.type(screen.getByLabelText(/Event Title/i), 'Admin Event with Assets');
+    await user.type(screen.getByLabelText(/Description & Agenda/i), 'Valid Description');
+    await user.type(screen.getByLabelText(/Location \/ Venue/i), 'Main Auditorium');
+    await user.type(screen.getByLabelText(/Organizer \/ Society Name/i), 'Admin Office');
+    await user.type(screen.getByLabelText(/Contact Email/i), 'admin@campus.edu');
+    await user.type(screen.getByLabelText(/Start Date & Time/i), '2026-11-20T10:00');
+    await user.type(screen.getByLabelText(/End Date & Time/i), '2026-11-22T10:00');
+    await user.type(screen.getByLabelText(/Registration Deadline/i), '2026-11-18T10:00');
+
+    // Attach valid QR file
+    const validQr = new File(['qr-bytes'], 'qr.png', { type: 'image/png' });
+    await user.upload(qrInput, validQr);
+
+    await user.click(screen.getByRole('button', { name: /Publish Event/i }));
+
+    await waitFor(() => {
+      expect(api.createEvent).toHaveBeenCalledTimes(1);
+      const arg = api.createEvent.mock.calls[0][0];
+      expect(arg instanceof FormData).toBe(true);
+      expect(arg.get('qrFile')).toBeDefined();
+    });
+  });
 });

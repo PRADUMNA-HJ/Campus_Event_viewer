@@ -69,6 +69,13 @@
 			<scope>runtime</scope>
 		</dependency>
 
+		<!-- Cloudinary: Persistent cloud image storage for banners and QR codes -->
+		<dependency>
+			<groupId>com.cloudinary</groupId>
+			<artifactId>cloudinary-http44</artifactId>
+			<version>1.39.0</version>
+		</dependency>
+
 		<!-- Test Starters -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>

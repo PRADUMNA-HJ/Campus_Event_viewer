@@ -58,8 +58,21 @@ public class EventCreateRequest {
     @Size(max = 500, message = "Banner URL must not exceed 500 characters")
     private String bannerUrl;
 
+    @Size(max = 255, message = "Banner public ID must not exceed 255 characters")
+    private String bannerPublicId;
+
+    @Size(max = 500, message = "QR code URL must not exceed 500 characters")
+    private String qrCodeUrl;
+
+    @Size(max = 255, message = "QR code public ID must not exceed 255 characters")
+    private String qrCodePublicId;
+
     @Size(max = 500, message = "Registration URL must not exceed 500 characters")
     private String registrationUrl;
+
+    private Boolean removeBanner;
+
+    private Boolean removeQrCode;
 
     public EventCreateRequest() {
     }
@@ -197,11 +210,51 @@ public class EventCreateRequest {
         this.bannerUrl = bannerUrl;
     }
 
+    public String getBannerPublicId() {
+        return bannerPublicId;
+    }
+
+    public void setBannerPublicId(String bannerPublicId) {
+        this.bannerPublicId = bannerPublicId;
+    }
+
+    public String getQrCodeUrl() {
+        return qrCodeUrl;
+    }
+
+    public void setQrCodeUrl(String qrCodeUrl) {
+        this.qrCodeUrl = qrCodeUrl;
+    }
+
+    public String getQrCodePublicId() {
+        return qrCodePublicId;
+    }
+
+    public void setQrCodePublicId(String qrCodePublicId) {
+        this.qrCodePublicId = qrCodePublicId;
+    }
+
     public String getRegistrationUrl() {
         return registrationUrl;
     }
 
     public void setRegistrationUrl(String registrationUrl) {
         this.registrationUrl = registrationUrl;
+    }
+
+    public Boolean getRemoveBanner() {
+        return removeBanner;
+    }
+
+    public void setRemoveBanner(Boolean removeBanner) {
+        this.removeBanner = removeBanner;
+    }
+
+    public Boolean getRemoveQrCode() {
+        return removeQrCode;
+    }
+
+    public void setRemoveQrCode(Boolean removeQrCode) {
+        this.removeQrCode = removeQrCode;
     }
 }

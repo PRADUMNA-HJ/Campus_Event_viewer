@@ -39,6 +39,9 @@ CREATE TABLE IF NOT EXISTS events (
     contact_email VARCHAR(150) NOT NULL,
     whatsapp_number VARCHAR(20),
     banner_url VARCHAR(500),
+    banner_public_id VARCHAR(255),
+    qr_code_url VARCHAR(500),
+    qr_code_public_id VARCHAR(255),
     registration_url VARCHAR(500),
     created_by_id BIGINT REFERENCES admins(id),
     reviewed_by_id BIGINT REFERENCES admins(id),
@@ -49,6 +52,9 @@ CREATE TABLE IF NOT EXISTS events (
 );
 
 -- Idempotent column additions for existing installations
+ALTER TABLE events ADD COLUMN IF NOT EXISTS banner_public_id VARCHAR(255);
+ALTER TABLE events ADD COLUMN IF NOT EXISTS qr_code_url VARCHAR(500);
+ALTER TABLE events ADD COLUMN IF NOT EXISTS qr_code_public_id VARCHAR(255);
 ALTER TABLE events ADD COLUMN IF NOT EXISTS registration_url VARCHAR(500);
 ALTER TABLE events ADD COLUMN IF NOT EXISTS created_by_id BIGINT REFERENCES admins(id);
 ALTER TABLE events ADD COLUMN IF NOT EXISTS reviewed_by_id BIGINT REFERENCES admins(id);

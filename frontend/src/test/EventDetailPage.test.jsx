@@ -93,4 +93,64 @@ describe('EventDetailPage Component', () => {
 
     expect(await screen.findByText('Failed to load event details.')).toBeInTheDocument();
   });
+
+  it('renders banner image when present, and fallback emoji when bannerUrl is missing', async () => {
+    vi.spyOn(api, 'fetchEventById').mockResolvedValue({
+      event: { ...sampleEvent, bannerUrl: 'https://example.com/banner.jpg', qrCodeUrl: null },
+      isMock: false,
+    });
+
+    const { unmount } = renderDetailPage('10');
+    expect(await screen.findByRole('img', { name: /Autonomous Robotics Hackathon 2026 banner/i })).toBeInTheDocument();
+    unmount();
+
+    vi.spyOn(api, 'fetchEventById').mockResolvedValue({
+      event: { ...sampleEvent, bannerUrl: null, qrCodeUrl: null },
+      isMock: false,
+    });
+
+    renderDetailPage('10');
+    expect(await screen.findByText('Autonomous Robotics Hackathon 2026')).toBeInTheDocument();
+    expect(screen.queryByRole('img', { name: /Autonomous Robotics Hackathon 2026 banner/i })).not.toBeInTheDocument();
+  });
+
+  it('renders uncropped QR code and dynamic registration helper text when qrCodeUrl is present', async () => {
+    vi.spyOn(api, 'fetchEventById').mockResolvedValue({
+      event: {
+        ...sampleEvent,
+        qrCodeUrl: 'https://example.com/qr.png',
+        registrationUrl: 'https://forms.gle/test1234',
+      },
+      isMock: false,
+    });
+
+    renderDetailPage('10');
+
+    expect(await screen.findByText('Event QR Code')).toBeInTheDocument();
+    expect(screen.getByText(/Scan with your camera to register instantly/i)).toBeInTheDocument();
+    const qrImg = screen.getByRole('img', { name: /QR code for registration/i });
+    expect(qrImg).toBeInTheDocument();
+    expect(qrImg).toHaveStyle({ objectFit: 'contain' });
+    expect(screen.getByRole('link', { name: /Open full resolution QR code/i })).toHaveAttribute(
+      'href',
+      'https://example.com/qr.png'
+    );
+  });
+
+  it('renders event-access helper text when qrCodeUrl is present but registrationUrl is null', async () => {
+    vi.spyOn(api, 'fetchEventById').mockResolvedValue({
+      event: {
+        ...sampleEvent,
+        qrCodeUrl: 'https://example.com/qr.png',
+        registrationUrl: null,
+      },
+      isMock: false,
+    });
+
+    renderDetailPage('10');
+
+    expect(await screen.findByText('Event QR Code')).toBeInTheDocument();
+    expect(screen.getByText(/Scan for direct mobile access, schedule, and venue check-in/i)).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: /QR code for event details/i })).toBeInTheDocument();
+  });
 });

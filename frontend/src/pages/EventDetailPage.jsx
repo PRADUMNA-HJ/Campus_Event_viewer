@@ -29,11 +29,15 @@ export default function EventDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isMock, setIsMock] = useState(false);
+  const [bannerError, setBannerError] = useState(false);
+  const [qrError, setQrError] = useState(false);
 
   useEffect(() => {
     const loadEvent = async () => {
       setLoading(true);
       setError(null);
+      setBannerError(false);
+      setQrError(false);
       try {
         const result = await fetchEventById(id);
         if (!result.event) {
@@ -111,8 +115,12 @@ export default function EventDetailPage() {
 
       {/* Banner */}
       <div className="event-detail__banner" id="event-banner">
-        {event.bannerUrl ? (
-          <img src={event.bannerUrl} alt={`${event.title} banner`} />
+        {event.bannerUrl && !bannerError ? (
+          <img
+            src={event.bannerUrl}
+            alt={`${event.title} banner`}
+            onError={() => setBannerError(true)}
+          />
         ) : (
           <div className="event-detail__banner-placeholder">{emoji}</div>
         )}
@@ -258,6 +266,73 @@ export default function EventDetailPage() {
               </div>
             )}
           </div>
+
+          {/* Event QR-Code Section */}
+          {event.qrCodeUrl && (
+            <div className="event-detail__info-card" id="event-qrcode-card" style={{ textAlign: 'center' }}>
+              <h3 style={{ marginBottom: 'var(--space-2)' }}>Event QR Code</h3>
+              <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)', marginBottom: 'var(--space-4)' }}>
+                {event.registrationUrl
+                  ? 'Scan with your camera to register instantly on your mobile device'
+                  : 'Scan for direct mobile access, schedule, and venue check-in'}
+              </p>
+              <div
+                style={{
+                  display: 'inline-block',
+                  background: '#ffffff',
+                  padding: 'var(--space-3)',
+                  borderRadius: 'var(--radius-lg)',
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+                  border: '1px solid var(--border-card)',
+                }}
+              >
+                {!qrError ? (
+                  <img
+                    src={event.qrCodeUrl}
+                    alt={`${event.title} QR code for ${event.registrationUrl ? 'registration' : 'event details'}`}
+                    style={{
+                      width: '180px',
+                      height: '180px',
+                      maxWidth: '100%',
+                      objectFit: 'contain',
+                      display: 'block',
+                    }}
+                    id="event-qrcode-img"
+                    onError={() => setQrError(true)}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      width: '180px',
+                      height: '180px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: 'var(--text-muted)',
+                      fontSize: 'var(--font-size-xs)',
+                      gap: 'var(--space-2)',
+                    }}
+                  >
+                    <span>⚠️</span>
+                    <span>QR image could not be loaded</span>
+                  </div>
+                )}
+              </div>
+              <div style={{ marginTop: 'var(--space-3)' }}>
+                <a
+                  href={event.qrCodeUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn--outline btn--sm"
+                  style={{ display: 'inline-block' }}
+                  aria-label={`Open full resolution QR code for ${event.title}`}
+                >
+                  View Full QR
+                </a>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

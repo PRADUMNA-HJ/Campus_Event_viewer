@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { createEvent, updateEvent, fetchEventById, ApiError } from '../services/api';
@@ -58,16 +58,77 @@ export default function AdminEventFormPage() {
     contactEmail: '',
     whatsappNumber: '',
     bannerUrl: '',
+    qrCodeUrl: '',
+    registrationUrl: '',
   });
+
+  const [bannerFile, setBannerFile] = useState(null);
+  const [bannerPreview, setBannerPreview] = useState('');
+  const [qrCodeFile, setQrCodeFile] = useState(null);
+  const [qrCodePreview, setQrCodePreview] = useState('');
+  const [removeBanner, setRemoveBanner] = useState(false);
+  const [removeQrCode, setRemoveQrCode] = useState(false);
+
+  // Object URL references for memory leak prevention
+  const bannerObjectUrlRef = useRef(null);
+  const qrObjectUrlRef = useRef(null);
 
   const [isLoadingEvent, setIsLoadingEvent] = useState(isEditMode);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({});
   const [generalError, setGeneralError] = useState('');
 
-  // If in edit mode, fetch existing event data to populate the form
+  // Cleanup object URLs on unmount or id change
   useEffect(() => {
-    if (!isEditMode) return;
+    return () => {
+      if (bannerObjectUrlRef.current) {
+        URL.revokeObjectURL(bannerObjectUrlRef.current);
+        bannerObjectUrlRef.current = null;
+      }
+      if (qrObjectUrlRef.current) {
+        URL.revokeObjectURL(qrObjectUrlRef.current);
+        qrObjectUrlRef.current = null;
+      }
+    };
+  }, [id]);
+
+  // If in edit mode, fetch existing event data to populate the form; otherwise reset
+  useEffect(() => {
+    if (!isEditMode) {
+      setFormData({
+        title: '',
+        description: '',
+        eventType: 'HACKATHON',
+        status: 'PUBLISHED',
+        location: '',
+        startDateTime: '',
+        endDateTime: '',
+        registrationDeadline: '',
+        maxCapacity: '',
+        organizerName: '',
+        contactEmail: '',
+        whatsappNumber: '',
+        bannerUrl: '',
+        qrCodeUrl: '',
+        registrationUrl: '',
+      });
+      if (bannerObjectUrlRef.current) {
+        URL.revokeObjectURL(bannerObjectUrlRef.current);
+        bannerObjectUrlRef.current = null;
+      }
+      if (qrObjectUrlRef.current) {
+        URL.revokeObjectURL(qrObjectUrlRef.current);
+        qrObjectUrlRef.current = null;
+      }
+      setBannerFile(null);
+      setBannerPreview('');
+      setQrCodeFile(null);
+      setQrCodePreview('');
+      setRemoveBanner(false);
+      setRemoveQrCode(false);
+      setIsLoadingEvent(false);
+      return;
+    }
 
     let isMounted = true;
     async function loadEvent() {
@@ -97,7 +158,15 @@ export default function AdminEventFormPage() {
             contactEmail: event.contactEmail || '',
             whatsappNumber: event.whatsappNumber || '',
             bannerUrl: event.bannerUrl || '',
+            qrCodeUrl: event.qrCodeUrl || '',
+            registrationUrl: event.registrationUrl || '',
           });
+          if (event.bannerUrl) {
+            setBannerPreview(event.bannerUrl);
+          }
+          if (event.qrCodeUrl) {
+            setQrCodePreview(event.qrCodeUrl);
+          }
         }
       } catch (err) {
         if (isMounted) {
@@ -115,11 +184,89 @@ export default function AdminEventFormPage() {
     return () => {
       isMounted = false;
     };
-  }, [id, isEditMode]);
+  }, [id, isEditMode, token]);
+
+  const handleBannerFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setGeneralError('Banner image size must not exceed 5 MB.');
+      return;
+    }
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!validTypes.includes(file.type)) {
+      setGeneralError('Unsupported file type. Please upload a JPEG, PNG, WebP, or GIF image.');
+      return;
+    }
+    setGeneralError('');
+    if (bannerObjectUrlRef.current) {
+      URL.revokeObjectURL(bannerObjectUrlRef.current);
+    }
+    const objectUrl = URL.createObjectURL(file);
+    bannerObjectUrlRef.current = objectUrl;
+    setBannerFile(file);
+    setBannerPreview(objectUrl);
+    setRemoveBanner(false);
+  };
+
+  const handleQrFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setGeneralError('QR code image size must not exceed 5 MB.');
+      return;
+    }
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!validTypes.includes(file.type)) {
+      setGeneralError('Unsupported file type. Please upload a JPEG, PNG, WebP, or GIF image.');
+      return;
+    }
+    setGeneralError('');
+    if (qrObjectUrlRef.current) {
+      URL.revokeObjectURL(qrObjectUrlRef.current);
+    }
+    const objectUrl = URL.createObjectURL(file);
+    qrObjectUrlRef.current = objectUrl;
+    setQrCodeFile(file);
+    setQrCodePreview(objectUrl);
+    setRemoveQrCode(false);
+  };
+
+  const handleRemoveBanner = () => {
+    if (bannerObjectUrlRef.current) {
+      URL.revokeObjectURL(bannerObjectUrlRef.current);
+      bannerObjectUrlRef.current = null;
+    }
+    setBannerFile(null);
+    setBannerPreview('');
+    setFormData((prev) => ({ ...prev, bannerUrl: '' }));
+    setRemoveBanner(true);
+  };
+
+  const handleRemoveQrCode = () => {
+    if (qrObjectUrlRef.current) {
+      URL.revokeObjectURL(qrObjectUrlRef.current);
+      qrObjectUrlRef.current = null;
+    }
+    setQrCodeFile(null);
+    setQrCodePreview('');
+    setFormData((prev) => ({ ...prev, qrCodeUrl: '' }));
+    setRemoveQrCode(true);
+  };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+    if (name === 'bannerUrl') {
+      setBannerPreview(value);
+      setBannerFile(null);
+      setRemoveBanner(!value);
+    }
+    if (name === 'qrCodeUrl') {
+      setQrCodePreview(value);
+      setQrCodeFile(null);
+      setRemoveQrCode(!value);
+    }
     if (fieldErrors[name]) {
       setFieldErrors((prev) => ({ ...prev, [name]: null }));
     }
@@ -234,16 +381,29 @@ export default function AdminEventFormPage() {
       contactEmail: formData.contactEmail.trim(),
       whatsappNumber: formData.whatsappNumber.trim() || null,
       bannerUrl: formData.bannerUrl.trim() || null,
+      qrCodeUrl: formData.qrCodeUrl ? formData.qrCodeUrl.trim() : null,
+      registrationUrl: formData.registrationUrl ? formData.registrationUrl.trim() : null,
+      removeBanner: removeBanner,
+      removeQrCode: removeQrCode,
     };
+
+    let submitData = payload;
+    if (bannerFile || qrCodeFile) {
+      const data = new FormData();
+      data.append('event', new Blob([JSON.stringify(payload)], { type: 'application/json' }));
+      if (bannerFile) data.append('bannerFile', bannerFile);
+      if (qrCodeFile) data.append('qrFile', qrCodeFile);
+      submitData = data;
+    }
 
     try {
       if (isEditMode) {
-        await updateEvent(id, payload, token);
+        await updateEvent(id, submitData, token);
         navigate('/admin/dashboard', {
           state: { flashMessage: `Event "${payload.title}" updated successfully.` },
         });
       } else {
-        await createEvent(payload, token);
+        await createEvent(submitData, token);
         navigate('/admin/dashboard', {
           state: { flashMessage: `Event "${payload.title}" created successfully.` },
         });
@@ -565,22 +725,165 @@ export default function AdminEventFormPage() {
             </div>
 
             <div className="form-group">
-              <label htmlFor="event-banner-url" className="form-label">
-                Banner Image URL <span className="form-label-hint">(Optional)</span>
+              <label htmlFor="event-reg-url" className="form-label">
+                Registration / Ticketing Link <span className="form-label-hint">(Optional)</span>
               </label>
               <input
-                id="event-banner-url"
-                name="bannerUrl"
+                id="event-reg-url"
+                name="registrationUrl"
                 type="url"
-                className={`form-input ${fieldErrors.bannerUrl ? 'form-input--error' : ''}`}
-                placeholder="https://example.com/images/banner.jpg"
-                value={formData.bannerUrl}
+                className="form-input"
+                placeholder="https://forms.gle/... or event platform"
+                value={formData.registrationUrl}
                 onChange={handleChange}
-                maxLength={500}
                 disabled={isSubmitting}
               />
-              {fieldErrors.bannerUrl && <span className="form-error">{fieldErrors.bannerUrl}</span>}
             </div>
+          </div>
+
+          {/* Poster / Banner Asset Section */}
+          <div className="card" style={{ padding: 'var(--space-4)', marginBottom: 'var(--space-6)', border: '1px solid var(--border-card)' }}>
+            <h3 style={{ fontSize: 'var(--font-size-base)', margin: '0 0 var(--space-3) 0' }}>
+              Event Banner / Poster (Optional)
+            </h3>
+            <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)', marginBottom: 'var(--space-3)' }}>
+              Upload a banner image (JPEG, PNG, WebP, GIF, max 5 MB) or provide a hosted image link.
+            </p>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label htmlFor="event-banner-file" className="form-label" style={{ fontSize: 'var(--font-size-xs)' }}>
+                  Upload Banner File
+                </label>
+                <input
+                  id="event-banner-file"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  className="form-input"
+                  onChange={handleBannerFileChange}
+                  disabled={isSubmitting}
+                />
+              </div>
+
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label htmlFor="event-banner-url" className="form-label" style={{ fontSize: 'var(--font-size-xs)' }}>
+                  Poster / Image URL (Optional)
+                </label>
+                <input
+                  id="event-banner-url"
+                  name="bannerUrl"
+                  type="url"
+                  className={`form-input ${fieldErrors.bannerUrl ? 'form-input--error' : ''}`}
+                  placeholder="https://images.unsplash.com/... or hosted poster link"
+                  value={formData.bannerUrl}
+                  onChange={handleChange}
+                  maxLength={500}
+                  disabled={isSubmitting}
+                />
+                {fieldErrors.bannerUrl && <span className="form-error">{fieldErrors.bannerUrl}</span>}
+              </div>
+            </div>
+
+            {bannerPreview && (
+              <div style={{ marginTop: 'var(--space-4)', textAlign: 'center', position: 'relative' }}>
+                <div style={{ display: 'inline-block', position: 'relative' }}>
+                  <img
+                    src={bannerPreview}
+                    alt="Poster preview"
+                    style={{
+                      maxHeight: '180px',
+                      borderRadius: 'var(--radius-md)',
+                      border: '1px solid var(--border-card)',
+                      objectFit: 'cover',
+                      maxWidth: '100%',
+                    }}
+                    onError={(e) => { e.target.style.display = 'none'; }}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleRemoveBanner}
+                    id="remove-banner-btn"
+                    className="btn btn--danger btn--sm"
+                    style={{ display: 'block', margin: 'var(--space-2) auto 0' }}
+                  >
+                    Remove Banner
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* QR-Code Asset Section */}
+          <div className="card" style={{ padding: 'var(--space-4)', marginBottom: 'var(--space-6)', border: '1px solid var(--border-card)' }}>
+            <h3 style={{ fontSize: 'var(--font-size-base)', margin: '0 0 var(--space-3) 0' }}>
+              Event QR-Code Image (Optional)
+            </h3>
+            <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--text-secondary)', marginBottom: 'var(--space-3)' }}>
+              {formData.registrationUrl
+                ? 'Upload a QR code linking to your registration page (Google Forms, ticketing, etc.). Displays uncropped in high contrast.'
+                : 'Upload a QR code for event check-in or brochure/website information. Displays uncropped in high contrast.'}
+            </p>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label htmlFor="event-qr-file" className="form-label" style={{ fontSize: 'var(--font-size-xs)' }}>
+                  Upload QR-Code File
+                </label>
+                <input
+                  id="event-qr-file"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  className="form-input"
+                  onChange={handleQrFileChange}
+                  disabled={isSubmitting}
+                />
+              </div>
+
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label htmlFor="event-qr-url" className="form-label" style={{ fontSize: 'var(--font-size-xs)' }}>
+                  QR Image Link / URL (Optional)
+                </label>
+                <input
+                  id="event-qr-url"
+                  name="qrCodeUrl"
+                  type="url"
+                  className="form-input"
+                  placeholder="https://... hosted QR code link"
+                  value={formData.qrCodeUrl}
+                  onChange={handleChange}
+                  disabled={isSubmitting}
+                />
+              </div>
+            </div>
+
+            {qrCodePreview && (
+              <div style={{ marginTop: 'var(--space-4)', textAlign: 'center' }}>
+                <div style={{ display: 'inline-block', background: '#ffffff', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-card)' }}>
+                  <img
+                    src={qrCodePreview}
+                    alt="QR-code preview"
+                    style={{
+                      maxHeight: '160px',
+                      maxWidth: '160px',
+                      objectFit: 'contain',
+                      display: 'block',
+                    }}
+                    onError={(e) => { e.target.style.display = 'none'; }}
+                  />
+                </div>
+                <div>
+                  <button
+                    type="button"
+                    onClick={handleRemoveQrCode}
+                    id="remove-qr-btn"
+                    className="btn btn--danger btn--sm"
+                    style={{ margin: 'var(--space-2) auto 0' }}
+                  >
+                    Remove QR Code
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Form Actions */}
@@ -601,7 +904,11 @@ export default function AdminEventFormPage() {
               {isSubmitting ? (
                 <>
                   <SpinnerIcon size={18} />
-                  <span>{isEditMode ? 'Updating Event...' : 'Creating Event...'}</span>
+                  <span>
+                    {(bannerFile || qrCodeFile)
+                      ? 'Uploading Assets & Submitting...'
+                      : (isEditMode ? 'Updating Event...' : 'Publishing Event...')}
+                  </span>
                 </>
               ) : (
                 <>

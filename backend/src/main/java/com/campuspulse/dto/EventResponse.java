@@ -26,6 +26,9 @@ public class EventResponse {
     private String contactEmail;
     private String whatsappNumber;
     private String bannerUrl;
+    private String bannerPublicId;
+    private String qrCodeUrl;
+    private String qrCodePublicId;
     private String registrationUrl;
     private Long createdById;
     private String createdByName;
@@ -100,6 +103,9 @@ public class EventResponse {
                 event.getCreatedAt(),
                 event.getUpdatedAt()
         );
+        resp.setBannerPublicId(event.getBannerPublicId());
+        resp.setQrCodeUrl(event.getQrCodeUrl());
+        resp.setQrCodePublicId(event.getQrCodePublicId());
         resp.setRegistrationUrl(event.getRegistrationUrl());
         if (event.getCreatedBy() != null) {
             resp.setCreatedById(event.getCreatedBy().getId());
@@ -224,6 +230,30 @@ public class EventResponse {
 
     public void setBannerUrl(String bannerUrl) {
         this.bannerUrl = bannerUrl;
+    }
+
+    public String getBannerPublicId() {
+        return bannerPublicId;
+    }
+
+    public void setBannerPublicId(String bannerPublicId) {
+        this.bannerPublicId = bannerPublicId;
+    }
+
+    public String getQrCodeUrl() {
+        return qrCodeUrl;
+    }
+
+    public void setQrCodeUrl(String qrCodeUrl) {
+        this.qrCodeUrl = qrCodeUrl;
+    }
+
+    public String getQrCodePublicId() {
+        return qrCodePublicId;
+    }
+
+    public void setQrCodePublicId(String qrCodePublicId) {
+        this.qrCodePublicId = qrCodePublicId;
     }
 
     public String getRegistrationUrl() {

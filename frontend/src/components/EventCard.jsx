@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CalendarIcon, MapPinIcon, ArrowRightIcon } from './Icons';
 import { formatDate, formatTime, getEventTypeEmoji } from '../utils/formatters';
@@ -18,8 +19,10 @@ export default function EventCard({ event, index = 0 }) {
     endDateTime,
     organizerName,
     bannerUrl,
+    qrCodeUrl,
   } = event;
 
+  const [imageError, setImageError] = useState(false);
   const emoji = getEventTypeEmoji(eventType);
   const initials = organizerName
     ? organizerName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()
@@ -34,12 +37,13 @@ export default function EventCard({ event, index = 0 }) {
     >
       {/* Banner */}
       <div className="event-card__banner">
-        {bannerUrl ? (
+        {bannerUrl && !imageError ? (
           <img
             src={bannerUrl}
             alt={`${title} banner`}
             className="event-card__banner-img"
             loading="lazy"
+            onError={() => setImageError(true)}
           />
         ) : (
           <div className="event-card__banner-placeholder">{emoji}</div>
@@ -55,6 +59,31 @@ export default function EventCard({ event, index = 0 }) {
         {status && status !== 'PUBLISHED' && (
           <span className={`event-card__status event-card__status--${status}`}>
             {status}
+          </span>
+        )}
+
+        {/* QR Code Indicator */}
+        {qrCodeUrl && (
+          <span
+            className="event-card__badge event-card__badge--qr"
+            title="Scan QR Code Available"
+            style={{
+              position: 'absolute',
+              bottom: 'var(--space-2)',
+              right: 'var(--space-2)',
+              background: 'rgba(0, 0, 0, 0.65)',
+              backdropFilter: 'blur(4px)',
+              color: '#ffffff',
+              fontSize: '11px',
+              padding: '2px 6px',
+              borderRadius: 'var(--radius-sm)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '3px',
+              zIndex: 2,
+            }}
+          >
+            📱 QR
           </span>
         )}
       </div>

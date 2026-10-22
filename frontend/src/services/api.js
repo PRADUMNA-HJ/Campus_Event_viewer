@@ -447,6 +447,7 @@ export async function fetchMyEvents(token) {
 
 /**
  * Creates a new event (Coordinator / Admin).
+ * Supports both JSON payload (plain object) and multipart FormData with bannerFile/qrFile.
  * POST /api/events
  */
 export async function createEvent(eventData, token) {
@@ -454,11 +455,15 @@ export async function createEvent(eventData, token) {
     throw new ApiError('Authentication required to create events.', 401);
   }
 
+  const isFormData = typeof FormData !== 'undefined' && eventData instanceof FormData;
+
   try {
     const response = await fetch(`${API_BASE_URL}/events`, {
       method: 'POST',
-      headers: authHeaders(token, { 'Content-Type': 'application/json' }),
-      body: JSON.stringify(eventData),
+      headers: isFormData
+        ? authHeaders(token)
+        : authHeaders(token, { 'Content-Type': 'application/json' }),
+      body: isFormData ? eventData : JSON.stringify(eventData),
     });
 
     if (!response.ok) {
@@ -476,6 +481,7 @@ export async function createEvent(eventData, token) {
 
 /**
  * Updates an existing event (Coordinator / Admin).
+ * Supports both JSON payload (plain object) and multipart FormData with bannerFile/qrFile.
  * PUT /api/events/{id}
  */
 export async function updateEvent(id, eventData, token) {
@@ -483,11 +489,15 @@ export async function updateEvent(id, eventData, token) {
     throw new ApiError('Authentication required to update events.', 401);
   }
 
+  const isFormData = typeof FormData !== 'undefined' && eventData instanceof FormData;
+
   try {
     const response = await fetch(`${API_BASE_URL}/events/${id}`, {
       method: 'PUT',
-      headers: authHeaders(token, { 'Content-Type': 'application/json' }),
-      body: JSON.stringify(eventData),
+      headers: isFormData
+        ? authHeaders(token)
+        : authHeaders(token, { 'Content-Type': 'application/json' }),
+      body: isFormData ? eventData : JSON.stringify(eventData),
     });
 
     if (!response.ok) {
@@ -500,6 +510,126 @@ export async function updateEvent(id, eventData, token) {
       throw error;
     }
     throw new ApiError('Unable to connect to server to update event.', 0);
+  }
+}
+
+/**
+ * Uploads or replaces an event banner image file.
+ * POST /api/events/{id}/banner
+ */
+export async function uploadEventBanner(id, file, token) {
+  if (!token) {
+    throw new ApiError('Authentication required to upload banner.', 401);
+  }
+
+  const formData = new FormData();
+  formData.append('file', file);
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/events/${id}/banner`, {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: formData,
+    });
+
+    if (!response.ok) {
+      await handleResponseError(response);
+    }
+
+    return await response.json();
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    throw new ApiError('Unable to upload banner image.', 0);
+  }
+}
+
+/**
+ * Deletes the event banner image asset.
+ * DELETE /api/events/{id}/banner
+ */
+export async function deleteEventBanner(id, token) {
+  if (!token) {
+    throw new ApiError('Authentication required to remove banner.', 401);
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/events/${id}/banner`, {
+      method: 'DELETE',
+      headers: authHeaders(token),
+    });
+
+    if (!response.ok) {
+      await handleResponseError(response);
+    }
+
+    return await response.json();
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    throw new ApiError('Unable to remove banner image.', 0);
+  }
+}
+
+/**
+ * Uploads or replaces an event QR-code image file.
+ * POST /api/events/{id}/qr
+ */
+export async function uploadEventQr(id, file, token) {
+  if (!token) {
+    throw new ApiError('Authentication required to upload QR code.', 401);
+  }
+
+  const formData = new FormData();
+  formData.append('file', file);
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/events/${id}/qr`, {
+      method: 'POST',
+      headers: authHeaders(token),
+      body: formData,
+    });
+
+    if (!response.ok) {
+      await handleResponseError(response);
+    }
+
+    return await response.json();
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    throw new ApiError('Unable to upload QR code image.', 0);
+  }
+}
+
+/**
+ * Deletes the event QR-code image asset.
+ * DELETE /api/events/{id}/qr
+ */
+export async function deleteEventQr(id, token) {
+  if (!token) {
+    throw new ApiError('Authentication required to remove QR code.', 401);
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/events/${id}/qr`, {
+      method: 'DELETE',
+      headers: authHeaders(token),
+    });
+
+    if (!response.ok) {
+      await handleResponseError(response);
+    }
+
+    return await response.json();
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    throw new ApiError('Unable to remove QR code image.', 0);
   }
 }
 

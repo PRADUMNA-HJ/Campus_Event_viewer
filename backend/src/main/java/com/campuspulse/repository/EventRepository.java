@@ -118,4 +118,24 @@ public interface EventRepository extends JpaRepository<Event, Long> {
      * @return list of all events
      */
     List<Event> findAllByOrderByStartDateTimeAsc();
+
+    /**
+     * Checks if a banner public ID is still referenced by any event other than the given event ID.
+     */
+    boolean existsByBannerPublicIdAndIdNot(String bannerPublicId, Long id);
+
+    /**
+     * Checks if a QR code public ID is still referenced by any event other than the given event ID.
+     */
+    boolean existsByQrCodePublicIdAndIdNot(String qrCodePublicId, Long id);
+
+    /**
+     * Checks if a banner public ID is referenced by any event.
+     */
+    boolean existsByBannerPublicId(String bannerPublicId);
+
+    /**
+     * Checks if a QR code public ID is referenced by any event.
+     */
+    boolean existsByQrCodePublicId(String qrCodePublicId);
 }

@@ -58,6 +58,13 @@ services:
       #   4. Save and redeploy.
       # AdminBootstrapRunner is idempotent: it only creates the admin ONCE (single-admin policy).
       # After the first successful deploy, you may remove these vars from the dashboard if desired.
+      #
+      # Persistent Image Storage (Cloudinary):
+      # Add the following MANUAL SECRETS in the Render dashboard:
+      #   CLOUDINARY_CLOUD_NAME = <your-cloudinary-cloud-name>
+      #   CLOUDINARY_API_KEY    = <your-cloudinary-api-key>
+      #   CLOUDINARY_API_SECRET = <your-cloudinary-api-secret>
+      # (Never commit secrets directly to git or render.yaml)
 
 # NOTE: The React frontend is deployed to Vercel (target hosting architecture).
 # The redundant Render static frontend service has been removed to avoid duplicate hosting and billing.

@@ -76,10 +76,10 @@ public class EventController {
     }
 
     /**
-     * POST /api/events - Create a new event.
+     * POST /api/events (JSON) - Create a new event without binary file parts.
      * Coordinators create events with status PENDING_REVIEW.
      */
-    @PostMapping
+    @PostMapping(consumes = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("hasAnyRole('COORDINATOR', 'MAIN_ADMIN', 'ADMIN')")
     public ResponseEntity<EventResponse> createEvent(@Valid @RequestBody EventCreateRequest request,
                                                      Principal principal) {
@@ -92,10 +92,25 @@ public class EventController {
     }
 
     /**
-     * PUT /api/events/{id} - Update an existing event.
+     * POST /api/events (Multipart) - Create a new event with optional banner and QR-code files.
+     */
+    @PostMapping(consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyRole('COORDINATOR', 'MAIN_ADMIN', 'ADMIN')")
+    public ResponseEntity<EventResponse> createEventMultipart(
+            @Valid @org.springframework.web.bind.annotation.RequestPart("event") EventCreateRequest request,
+            @org.springframework.web.bind.annotation.RequestPart(value = "bannerFile", required = false) org.springframework.web.multipart.MultipartFile bannerFile,
+            @org.springframework.web.bind.annotation.RequestPart(value = "qrFile", required = false) org.springframework.web.multipart.MultipartFile qrFile,
+            Principal principal) {
+        String actor = principal != null ? principal.getName() : null;
+        EventResponse created = eventService.createEventWithImages(request, bannerFile, qrFile, actor);
+        return ResponseEntity.status(HttpStatus.CREATED).body(created);
+    }
+
+    /**
+     * PUT /api/events/{id} (JSON) - Update an existing event.
      * Coordinators can only update their own events; updates return published events to PENDING_REVIEW.
      */
-    @PutMapping("/{id}")
+    @PutMapping(value = "/{id}", consumes = org.springframework.http.MediaType.APPLICATION_JSON_VALUE)
     @PreAuthorize("hasAnyRole('COORDINATOR', 'MAIN_ADMIN', 'ADMIN')")
     public ResponseEntity<EventResponse> updateEvent(@PathVariable Long id,
                                                      @Valid @RequestBody EventCreateRequest request,
@@ -106,6 +121,76 @@ public class EventController {
         }
         EventResponse updatedEvent = eventService.updateEvent(id, request);
         return ResponseEntity.ok(updatedEvent);
+    }
+
+    /**
+     * PUT /api/events/{id} (Multipart) - Update an existing event with optional new banner and QR-code files.
+     */
+    @PutMapping(value = "/{id}", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyRole('COORDINATOR', 'MAIN_ADMIN', 'ADMIN')")
+    public ResponseEntity<EventResponse> updateEventMultipart(
+            @PathVariable Long id,
+            @Valid @org.springframework.web.bind.annotation.RequestPart("event") EventCreateRequest request,
+            @org.springframework.web.bind.annotation.RequestPart(value = "bannerFile", required = false) org.springframework.web.multipart.MultipartFile bannerFile,
+            @org.springframework.web.bind.annotation.RequestPart(value = "qrFile", required = false) org.springframework.web.multipart.MultipartFile qrFile,
+            Principal principal) {
+        String actor = principal != null ? principal.getName() : null;
+        EventResponse updated = eventService.updateEventWithImages(id, request, bannerFile, qrFile, actor);
+        return ResponseEntity.ok(updated);
+    }
+
+    /**
+     * POST /api/events/{id}/banner - Upload or replace banner image for an existing event.
+     */
+    @PostMapping(value = "/{id}/banner", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyRole('COORDINATOR', 'MAIN_ADMIN', 'ADMIN')")
+    public ResponseEntity<EventResponse> uploadBanner(
+            @PathVariable Long id,
+            @org.springframework.web.bind.annotation.RequestParam("file") org.springframework.web.multipart.MultipartFile file,
+            Principal principal) {
+        String actor = principal != null ? principal.getName() : null;
+        EventResponse updated = eventService.uploadBanner(id, file, actor);
+        return ResponseEntity.ok(updated);
+    }
+
+    /**
+     * DELETE /api/events/{id}/banner - Remove banner image from an existing event.
+     */
+    @DeleteMapping("/{id}/banner")
+    @PreAuthorize("hasAnyRole('COORDINATOR', 'MAIN_ADMIN', 'ADMIN')")
+    public ResponseEntity<EventResponse> deleteBanner(
+            @PathVariable Long id,
+            Principal principal) {
+        String actor = principal != null ? principal.getName() : null;
+        EventResponse updated = eventService.deleteBanner(id, actor);
+        return ResponseEntity.ok(updated);
+    }
+
+    /**
+     * POST /api/events/{id}/qr - Upload or replace QR-code image for an existing event.
+     */
+    @PostMapping(value = "/{id}/qr", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyRole('COORDINATOR', 'MAIN_ADMIN', 'ADMIN')")
+    public ResponseEntity<EventResponse> uploadQrCode(
+            @PathVariable Long id,
+            @org.springframework.web.bind.annotation.RequestParam("file") org.springframework.web.multipart.MultipartFile file,
+            Principal principal) {
+        String actor = principal != null ? principal.getName() : null;
+        EventResponse updated = eventService.uploadQrCode(id, file, actor);
+        return ResponseEntity.ok(updated);
+    }
+
+    /**
+     * DELETE /api/events/{id}/qr - Remove QR-code image from an existing event.
+     */
+    @DeleteMapping("/{id}/qr")
+    @PreAuthorize("hasAnyRole('COORDINATOR', 'MAIN_ADMIN', 'ADMIN')")
+    public ResponseEntity<EventResponse> deleteQrCode(
+            @PathVariable Long id,
+            Principal principal) {
+        String actor = principal != null ? principal.getName() : null;
+        EventResponse updated = eventService.deleteQrCode(id, actor);
+        return ResponseEntity.ok(updated);
     }
 
     /**

@@ -331,4 +331,49 @@ describe('CoordinatorEventFormPage Component', () => {
       expect(screen.getByText('Coordinator Dashboard')).toBeInTheDocument();
     });
   });
+
+  it('renders banner and QR-code upload inputs and rejects files exceeding 5MB', async () => {
+    const user = userEvent.setup();
+    renderCreateForm();
+
+    const bannerInput = screen.getByLabelText(/Upload Banner File/i);
+    const qrInput = screen.getByLabelText(/Upload QR-Code File/i);
+    expect(bannerInput).toBeInTheDocument();
+    expect(qrInput).toBeInTheDocument();
+
+    // Create an oversized file (6 MB)
+    const largeFile = new File([new Uint8Array(6 * 1024 * 1024)], 'huge.jpg', { type: 'image/jpeg' });
+    await user.upload(bannerInput, largeFile);
+    expect(screen.getByText(/Banner image size must not exceed 5 MB/i)).toBeInTheDocument();
+
+    const largeQrFile = new File([new Uint8Array(6 * 1024 * 1024)], 'huge-qr.png', { type: 'image/png' });
+    await user.upload(qrInput, largeQrFile);
+    expect(screen.getByText(/QR code image size must not exceed 5 MB/i)).toBeInTheDocument();
+  });
+
+  it('submits multipart FormData when banner or QR file is attached', async () => {
+    const user = userEvent.setup();
+    global.URL.createObjectURL = vi.fn(() => 'mock-blob-url');
+
+    vi.spyOn(api, 'createEvent').mockResolvedValue({ id: 99, title: 'Hackathon with Image' });
+    renderCreateForm();
+
+    await user.type(screen.getByLabelText(/Event Title/i), 'Hackathon with Image');
+    await user.type(screen.getByLabelText(/Description/i), 'Awesome hackathon with custom assets');
+    await user.type(screen.getByLabelText(/Location/i), 'Main Auditorium');
+    await user.type(screen.getByLabelText(/Start Date/i), '2026-11-20T10:00');
+    await user.type(screen.getByLabelText(/End Date/i), '2026-11-20T18:00');
+
+    const bannerFile = new File(['mock content'], 'poster.png', { type: 'image/png' });
+    await user.upload(screen.getByLabelText(/Upload Banner File/i), bannerFile);
+
+    await user.click(screen.getByRole('button', { name: /Submit for Review/i }));
+
+    await waitFor(() => {
+      expect(api.createEvent).toHaveBeenCalledTimes(1);
+      const callArg = api.createEvent.mock.calls[0][0];
+      expect(callArg instanceof FormData).toBe(true);
+      expect(callArg.get('bannerFile')).toBeDefined();
+    });
+  });
 });

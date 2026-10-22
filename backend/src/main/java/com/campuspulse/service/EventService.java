@@ -98,4 +98,41 @@ public interface EventService {
      * Rejects an event submission (Main Admin only).
      */
     EventResponse rejectEvent(Long id, String adminEmail, String note);
+
+    /**
+     * Creates an event with optional uploaded banner and QR-code assets.
+     */
+    EventResponse createEventWithImages(EventCreateRequest request,
+                                       org.springframework.web.multipart.MultipartFile bannerFile,
+                                       org.springframework.web.multipart.MultipartFile qrFile,
+                                       String principalEmail);
+
+    /**
+     * Updates an event with optional uploaded banner and QR-code assets.
+     */
+    EventResponse updateEventWithImages(Long id,
+                                       EventCreateRequest request,
+                                       org.springframework.web.multipart.MultipartFile bannerFile,
+                                       org.springframework.web.multipart.MultipartFile qrFile,
+                                       String principalEmail);
+
+    /**
+     * Uploads or replaces the banner image for an existing event.
+     */
+    EventResponse uploadBanner(Long id, org.springframework.web.multipart.MultipartFile file, String principalEmail);
+
+    /**
+     * Deletes the banner image from an event and cleans up cloud storage.
+     */
+    EventResponse deleteBanner(Long id, String principalEmail);
+
+    /**
+     * Uploads or replaces the QR-code image for an existing event.
+     */
+    EventResponse uploadQrCode(Long id, org.springframework.web.multipart.MultipartFile file, String principalEmail);
+
+    /**
+     * Deletes the QR-code image from an event and cleans up cloud storage.
+     */
+    EventResponse deleteQrCode(Long id, String principalEmail);
 }
