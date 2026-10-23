@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { LockIcon, DashboardIcon, LogOutIcon, PlusIcon, UsersIcon, ExternalLinkIcon } from './Icons';
@@ -13,8 +13,18 @@ export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
   const { isAuthenticated, user, logout, isMainAdmin, isCoordinator, isUser } = useAuth();
+  const toggleBtnRef = useRef(null);
 
   const isAdminRoute = location.pathname.startsWith('/admin') && location.pathname !== '/admin/login';
+
+  const closeMobile = useCallback(() => {
+    setMobileOpen(false);
+  }, []);
+
+  const handleMobileLogout = useCallback(() => {
+    setMobileOpen(false);
+    logout();
+  }, [logout]);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
@@ -22,10 +32,45 @@ export default function Navbar() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Close mobile menu on navigation
-  useEffect(() => {
+  const [prevPath, setPrevPath] = useState(location.pathname);
+  if (prevPath !== location.pathname) {
+    setPrevPath(location.pathname);
     setMobileOpen(false);
-  }, [location]);
+  }
+
+  // Close on Escape key press and restore focus to toggle button
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setMobileOpen(false);
+        toggleBtnRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [mobileOpen]);
+
+  // Close when resized past mobile breakpoint
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth > 768) {
+        setMobileOpen(false);
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Lock background scroll when mobile menu is open
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [mobileOpen]);
 
   const isActive = (path) => {
     if (path === '/') return location.pathname === '/';
@@ -48,7 +93,7 @@ export default function Navbar() {
     <>
       <nav className={`navbar ${scrolled ? 'navbar--scrolled' : ''}`} id="main-nav">
         <div className="container navbar__inner">
-          <Link to={isAdminRoute ? '/admin/dashboard' : '/'} className="navbar__logo" id="nav-logo">
+          <Link to={isAdminRoute ? '/admin/dashboard' : '/'} className="navbar__logo" id="nav-logo" onClick={closeMobile}>
             <span className="navbar__logo-icon">CP</span>
             <span className="gradient-text">CampusPulse</span>
             {isAdminRoute && (
@@ -279,9 +324,13 @@ export default function Navbar() {
           )}
 
           <button
-            className="navbar__mobile-toggle"
-            onClick={() => setMobileOpen(!mobileOpen)}
+            ref={toggleBtnRef}
+            type="button"
+            className={`navbar__mobile-toggle ${mobileOpen ? 'navbar__mobile-toggle--open' : ''}`}
+            onClick={() => setMobileOpen((prev) => !prev)}
             aria-label="Toggle navigation menu"
+            aria-expanded={mobileOpen}
+            aria-controls="nav-mobile-menu"
             id="nav-mobile-toggle"
           >
             <span></span>
@@ -291,12 +340,29 @@ export default function Navbar() {
         </div>
       </nav>
 
+      {/* Backdrop overlay */}
+      {mobileOpen && (
+        <div
+          className="navbar__backdrop"
+          onClick={closeMobile}
+          aria-hidden="true"
+          id="nav-mobile-backdrop"
+        />
+      )}
+
       {/* Mobile Drawer Navigation */}
-      <div className={`navbar__mobile-menu ${mobileOpen ? 'open' : ''}`} id="nav-mobile-menu">
+      <div
+        className={`navbar__mobile-menu ${mobileOpen ? 'open' : ''}`}
+        id="nav-mobile-menu"
+        role="navigation"
+        aria-label="Mobile Navigation"
+        onClick={(e) => e.stopPropagation()}
+      >
         <Link
           to="/"
           className={`navbar__mobile-link ${isActive('/') && !location.pathname.startsWith('/admin') && !location.pathname.startsWith('/coordinator') ? 'navbar__mobile-link--active' : ''}`}
           id="nav-mobile-link-events"
+          onClick={closeMobile}
         >
           Events
         </Link>
@@ -304,6 +370,7 @@ export default function Navbar() {
           to="/today"
           className={`navbar__mobile-link ${isActive('/today') ? 'navbar__mobile-link--active' : ''}`}
           id="nav-mobile-link-today"
+          onClick={closeMobile}
         >
           Happening Today
         </Link>
@@ -311,6 +378,7 @@ export default function Navbar() {
           to="/about"
           className={`navbar__mobile-link ${isActive('/about') ? 'navbar__mobile-link--active' : ''}`}
           id="nav-mobile-link-about"
+          onClick={closeMobile}
         >
           About
         </Link>
@@ -320,20 +388,42 @@ export default function Navbar() {
             <Link
               to={getDashboardPath()}
               className="navbar__mobile-link navbar__mobile-link--admin"
+              id="nav-mobile-link-dashboard"
+              onClick={closeMobile}
             >
               <DashboardIcon size={16} />
               <span>{isMainAdmin ? 'Admin Dashboard' : isCoordinator ? 'Coordinator Dashboard' : 'My Application'}</span>
             </Link>
 
             {isUser && (
-              <Link to="/coordinator/request" className="navbar__mobile-link">
-                <UsersIcon size={16} />
-                <span>Request Coordinator Access</span>
-              </Link>
+              <>
+                <Link
+                  to="/coordinator/request"
+                  className="navbar__mobile-link"
+                  id="nav-mobile-link-coord-request"
+                  onClick={closeMobile}
+                >
+                  <UsersIcon size={16} />
+                  <span>Request Coordinator Access</span>
+                </Link>
+                <Link
+                  to="/coordinator/status"
+                  className="navbar__mobile-link"
+                  id="nav-mobile-link-coord-status"
+                  onClick={closeMobile}
+                >
+                  <span>Application Status</span>
+                </Link>
+              </>
             )}
 
             {(isCoordinator || isMainAdmin) && (
-              <Link to={isMainAdmin ? '/admin/events/new' : '/coordinator/events/new'} className="navbar__mobile-link">
+              <Link
+                to={isMainAdmin ? '/admin/events/new' : '/coordinator/events/new'}
+                className="navbar__mobile-link"
+                id="nav-mobile-link-new-event"
+                onClick={closeMobile}
+              >
                 <PlusIcon size={16} />
                 <span>Create New Event</span>
               </Link>
@@ -346,8 +436,9 @@ export default function Navbar() {
             </div>
             <button
               type="button"
-              onClick={logout}
+              onClick={handleMobileLogout}
               className="navbar__mobile-logout"
+              id="nav-mobile-logout-btn"
             >
               <LogOutIcon size={16} />
               <span>Logout</span>
@@ -355,12 +446,19 @@ export default function Navbar() {
           </>
         ) : (
           <>
-            <Link to="/register" className="navbar__mobile-link">
+            <Link
+              to="/register"
+              className="navbar__mobile-link"
+              id="nav-mobile-link-register"
+              onClick={closeMobile}
+            >
               <span>Register Student Account</span>
             </Link>
             <Link
               to="/admin/login"
               className={`navbar__mobile-link ${isActive('/admin/login') || isActive('/login') ? 'navbar__mobile-link--active' : ''}`}
+              id="nav-mobile-link-login"
+              onClick={closeMobile}
             >
               <LockIcon size={16} />
               <span>Sign In</span>
